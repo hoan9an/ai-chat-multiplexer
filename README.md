@@ -4,6 +4,8 @@ Desktop workspace for running multiple AI chat sessions side by side, with Chrom
 
 ![Status](https://img.shields.io/badge/status-active-success) ![Tauri](https://img.shields.io/badge/Tauri-2-orange) ![React](https://img.shields.io/badge/React-19-blue) ![License](https://img.shields.io/badge/license-MIT-green)
 
+Languages: [English](./README.md) · [Tiếng Việt](./README.vi.md) · [中文](./README.zh.md)
+
 ---
 
 ## Overview
