@@ -40,6 +40,3 @@ src-tauri/target/
 .codeboarding/
 
 coverage/
-
-brda.txt
-coverage-text.txt
