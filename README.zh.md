@@ -212,7 +212,6 @@ cookie、localStorage、IndexedDB、cache 和登录 session 都按 profile 隔�
 6. menu/modal/download panel/drag overlay 打开时必须隐藏 native webview。
 7. 被动 native status polling 不能触发 reload。
 8. State migration 必须保留用户数据。
-9. Full backup 可能包含敏感 session 数据。
 
 ---
 

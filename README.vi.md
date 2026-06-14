@@ -212,7 +212,6 @@ Khi sửa app, cần giữ các luật sau:
 6. Native webview phải ẩn khi menu/modal/download panel/drag overlay mở.
 7. Polling status từ native webview không được tự gây reload.
 8. Migration state phải giữ dữ liệu user.
-9. Full backup có thể chứa dữ liệu nhạy cảm.
 
 ---
 

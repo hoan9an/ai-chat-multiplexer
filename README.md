@@ -253,7 +253,6 @@ When modifying the app, keep these rules intact:
 6. Native webviews should be hidden while menus, modals, download panels, or drag overlays are active.
 7. Passive native status polling must not trigger native reloads.
 8. State migrations must preserve existing user workspaces/profiles/tabs.
-9. Full backups may contain sensitive session data.
 
 ---
 
