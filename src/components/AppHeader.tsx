@@ -8,6 +8,7 @@ import {
   IconTrash,
 } from "../Icons";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
+import { useTranslation } from "../i18n";
 import type { AppState, Profile, Workspace } from "../appCore";
 
 export interface AppHeaderProps {
@@ -68,6 +69,7 @@ export function AppHeader({
   setIsDownloadsOpen,
   setIsSettingsOpen,
 }: AppHeaderProps) {
+  const { t } = useTranslation();
   return (
     <header className="terminal-topbar">
       <section className="brand">
@@ -94,10 +96,10 @@ export function AppHeader({
         />
       </section>
 
-      <section className="toolbar" aria-label="Điều khiển layout">
-        <div className="layout-segment" aria-label="Chọn bố cục">
+      <section className="toolbar" aria-label={t("header.layoutControls")}>
+        <div className="layout-segment" aria-label={t("header.chooseLayout")}>
           {[
-            { value: 1, label: "Focus" },
+            { value: 1, label: t("header.focus") },
             { value: 2, label: "2" },
             { value: 3, label: "3" },
             { value: 4, label: "4" },
@@ -122,8 +124,8 @@ export function AppHeader({
           open={isNewPaneMenuOpen}
           onToggle={(event) => setIsNewPaneMenuOpen(event.currentTarget.open)}
         >
-          <summary>New pane</summary>
-          <div className="preset-menu profile-menu" aria-label="Chọn profile cho pane mới">
+          <summary>{t("header.newPane")}</summary>
+          <div className="preset-menu profile-menu" aria-label={t("header.chooseProfile")}>
             {state.profiles.map((profile) => (
               <div className="profile-row" key={profile.id} role="none">
                 <button
@@ -144,8 +146,8 @@ export function AppHeader({
                     event.stopPropagation();
                     renameProfile(profile.id);
                   }}
-                  aria-label={`Đổi tên ${profile.name}`}
-                  title="Đổi tên"
+                  aria-label={t("header.renameProfile", { name: profile.name })}
+                  title={t("header.rename")}
                 >
                   <IconEdit size={11} />
                 </button>
@@ -156,8 +158,8 @@ export function AppHeader({
                     event.stopPropagation();
                     deleteProfile(profile.id);
                   }}
-                  aria-label={`Xóa ${profile.name}`}
-                  title="Xóa profile"
+                  aria-label={t("header.deleteProfile", { name: profile.name })}
+                  title={t("header.deleteProfileTitle")}
                 >
                   <IconTrash size={11} />
                 </button>
@@ -170,9 +172,9 @@ export function AppHeader({
               onClick={() => {
                 setIsNewPaneMenuOpen(false);
                 openTextPrompt({
-                  title: "Profile mới",
+                  title: t("header.newProfileTitle"),
                   initial: "",
-                  placeholder: "vd: Work, Personal",
+                  placeholder: t("header.newProfilePlaceholder"),
                   onSubmit: (name) => {
                     const profile = ensureProfileWithName(name);
                     addBlankPaneWithProfile(profile);
@@ -183,7 +185,7 @@ export function AppHeader({
               <span className="profile-dot" aria-hidden="true">
                 <IconPlus size={11} />
               </span>
-              <span>New profile…</span>
+              <span>{t("header.newProfile")}</span>
             </button>
           </div>
         </details>
@@ -191,8 +193,8 @@ export function AppHeader({
           type="button"
           className="theme-toggle downloads-button"
           onClick={() => setIsDownloadsOpen((open) => !open)}
-          aria-label="Tải xuống"
-          title="Tải xuống"
+          aria-label={t("downloads.title")}
+          title={t("downloads.title")}
         >
           <IconDownload size={14} />
           {hasActiveDownload && <span className="downloads-button-dot" aria-hidden="true" />}
@@ -201,7 +203,7 @@ export function AppHeader({
           type="button"
           className="theme-toggle"
           onClick={() => setIsSettingsOpen(true)}
-          aria-label="Mở cài đặt"
+          aria-label={t("header.openSettings")}
           title="Settings"
         >
           <IconSettings size={14} />

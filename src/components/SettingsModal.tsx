@@ -10,6 +10,7 @@ import {
   IconX,
 } from "../Icons";
 import { APP_VERSION, GITHUB_REPO, isTauriRuntime, type ThemeMode } from "../appCore";
+import { useTranslation, type Lang } from "../i18n";
 
 void _IconSettings; // re-exported indirectly so the file remains stable on tree-shake
 
@@ -17,6 +18,9 @@ export type UpdateStatus =
   | { kind: "idle" }
   | { kind: "checking" }
   | { kind: "available"; latest: string; releaseUrl: string }
+  | { kind: "downloading"; latest: string; progress: number }
+  | { kind: "installing"; latest: string }
+  | { kind: "readyToInstall"; latest: string }
   | { kind: "current" }
   | { kind: "error"; message: string };
 
@@ -29,6 +33,7 @@ export type SettingsModalProps = {
   onThemeChange: (theme: ThemeMode) => void;
   updateStatus: UpdateStatus;
   onCheckForUpdates: () => void;
+  onDownloadAndInstall: () => void;
   onOpenReleasePage: (url: string) => void;
   backupBusy: BackupBusy;
   onExportConfig: () => void;
@@ -44,6 +49,7 @@ export function SettingsModal({
   onThemeChange,
   updateStatus,
   onCheckForUpdates,
+  onDownloadAndInstall,
   onOpenReleasePage,
   backupBusy,
   onExportConfig,
@@ -51,7 +57,15 @@ export function SettingsModal({
   onExportFullBackup,
   onRestoreFullBackup,
 }: SettingsModalProps) {
+  const { t, lang, setLang } = useTranslation();
+
   if (!open) return null;
+
+  const languages: { value: Lang; label: string }[] = [
+    { value: "vi", label: t("settings.langVietnamese") },
+    { value: "en", label: t("settings.langEnglish") },
+    { value: "zh", label: t("settings.langChinese") },
+  ];
 
   return (
     <div
@@ -62,73 +76,119 @@ export function SettingsModal({
     >
       <div className="modal-card settings-card">
         <header className="settings-header">
-          <h3 className="modal-title">Settings</h3>
+          <h3 className="modal-title">{t("settings.title")}</h3>
           <button
             type="button"
             className="icon-button"
             onClick={onClose}
-            aria-label="Đóng"
+            aria-label={t("common.close")}
           >
             <IconX size={14} />
           </button>
         </header>
 
         <section className="settings-section">
-          <h4 className="settings-section-title">Giao diện</h4>
+          <h4 className="settings-section-title">{t("settings.appearance")}</h4>
           <div className="settings-row">
-            <span className="settings-label">Chế độ</span>
+            <span className="settings-label">{t("settings.mode")}</span>
             <div className="layout-segment settings-theme-segment">
               <button
                 type="button"
                 className={theme === "light" ? "segment active" : "segment"}
                 onClick={() => onThemeChange("light")}
               >
-                <IconSun size={12} /> Sáng
+                <IconSun size={12} /> {t("settings.light")}
               </button>
               <button
                 type="button"
                 className={theme === "dark" ? "segment active" : "segment"}
                 onClick={() => onThemeChange("dark")}
               >
-                <IconMoon size={12} /> Tối
+                <IconMoon size={12} /> {t("settings.dark")}
               </button>
+            </div>
+          </div>
+          <div className="settings-row">
+            <span className="settings-label">{t("settings.language")}</span>
+            <div className="layout-segment settings-language-segment">
+              {languages.map((item) => (
+                <button
+                  key={item.value}
+                  type="button"
+                  className={lang === item.value ? "segment active" : "segment"}
+                  onClick={() => setLang(item.value)}
+                >
+                  {item.label}
+                </button>
+              ))}
             </div>
           </div>
         </section>
 
         <section className="settings-section">
-          <h4 className="settings-section-title">Cập nhật</h4>
+          <h4 className="settings-section-title">{t("settings.updates")}</h4>
           <div className="settings-row">
-            <span className="settings-label">Phiên bản hiện tại</span>
+            <span className="settings-label">{t("settings.currentVersion")}</span>
             <span className="settings-meta">v{APP_VERSION}</span>
           </div>
           <div className="settings-row settings-update-row">
             {updateStatus.kind === "idle" && (
               <button type="button" className="modal-btn" onClick={onCheckForUpdates}>
-                <IconRefresh size={12} /> Kiểm tra cập nhật
+                <IconRefresh size={12} /> {t("update.check")}
               </button>
             )}
             {updateStatus.kind === "checking" && (
-              <span className="settings-meta">Đang kiểm tra…</span>
+              <span className="settings-meta">{t("update.checking")}</span>
             )}
             {updateStatus.kind === "current" && (
               <span className="settings-meta success">
-                <IconCheck size={12} /> Bạn đang dùng phiên bản mới nhất.
+                <IconCheck size={12} /> {t("update.current")}
               </span>
             )}
             {updateStatus.kind === "available" && (
               <div className="settings-update-available">
                 <span>
-                  Có bản mới: <strong>v{updateStatus.latest}</strong>
+                  {t("update.availablePrefix")}
+                  <strong>v{updateStatus.latest}</strong>
                 </span>
-                <button
-                  type="button"
-                  className="modal-btn primary"
-                  onClick={() => onOpenReleasePage(updateStatus.releaseUrl)}
-                >
-                  <IconExternal size={12} /> Mở trang tải
-                </button>
+                {isTauriRuntime() ? (
+                  <button
+                    type="button"
+                    className="modal-btn primary"
+                    onClick={onDownloadAndInstall}
+                  >
+                    <IconDownload size={12} /> {t("update.downloadInstall")}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="modal-btn primary"
+                    onClick={() => onOpenReleasePage(updateStatus.releaseUrl)}
+                  >
+                    <IconExternal size={12} /> {t("update.openDownload")}
+                  </button>
+                )}
               </div>
+            )}
+            {updateStatus.kind === "downloading" && (
+              <div className="settings-update-available">
+                <span>
+                  {t("update.downloading")}
+                  <strong> {updateStatus.progress}%</strong>
+                </span>
+                <progress
+                  className="update-progress"
+                  max={100}
+                  value={updateStatus.progress}
+                  aria-label={t("update.downloading")}
+                />
+              </div>
+            )}
+            {updateStatus.kind === "installing" && (
+              <span className="settings-meta">{t("update.installing")}</span>
+            )}
+            {updateStatus.kind === "readyToInstall" && (
+              <span className="settings-meta">{t("update.restarting")}</span>
             )}
             {updateStatus.kind === "error" && (
               <span className="settings-meta danger">{updateStatus.message}</span>
@@ -137,9 +197,12 @@ export function SettingsModal({
         </section>
 
         <section className="settings-section">
-          <h4 className="settings-section-title">Backup & khôi phục</h4>
+          <h4 className="settings-section-title">{t("settings.backupRestore")}</h4>
           <p className="settings-help">
-            <strong>Cấu hình</strong> chỉ chứa workspace và profile (không bao gồm cookie). <strong>Full backup</strong> kèm session đăng nhập.
+            <strong>{t("backup.configWord")}</strong>
+            {t("backup.helpMiddle")}
+            <strong>{t("backup.fullBackupWord")}</strong>
+            {t("backup.helpEnd")}
           </p>
           <div className="settings-actions">
             <button
@@ -148,7 +211,7 @@ export function SettingsModal({
               onClick={onExportConfig}
               disabled={backupBusy !== "idle"}
             >
-              <IconDownload size={12} /> Xuất cấu hình (.json)
+              <IconDownload size={12} /> {t("backup.exportConfig")}
             </button>
             <button
               type="button"
@@ -156,7 +219,7 @@ export function SettingsModal({
               onClick={onImportConfig}
               disabled={backupBusy !== "idle"}
             >
-              <IconUpload size={12} /> Nhập cấu hình
+              <IconUpload size={12} /> {t("backup.importConfig")}
             </button>
           </div>
           <div className="settings-actions">
@@ -165,18 +228,18 @@ export function SettingsModal({
               className="modal-btn"
               onClick={onExportFullBackup}
               disabled={backupBusy !== "idle" || !isTauriRuntime()}
-              title={!isTauriRuntime() ? "Chỉ chạy trong app desktop" : undefined}
+              title={!isTauriRuntime() ? t("backup.desktopOnly") : undefined}
             >
-              <IconDownload size={12} /> Full backup (.zip)
+              <IconDownload size={12} /> {t("backup.fullBackup")}
             </button>
             <button
               type="button"
               className="modal-btn"
               onClick={onRestoreFullBackup}
               disabled={backupBusy !== "idle" || !isTauriRuntime()}
-              title={!isTauriRuntime() ? "Chỉ chạy trong app desktop" : undefined}
+              title={!isTauriRuntime() ? t("backup.desktopOnly") : undefined}
             >
-              <IconUpload size={12} /> Khôi phục từ backup
+              <IconUpload size={12} /> {t("backup.restoreBackup")}
             </button>
           </div>
         </section>

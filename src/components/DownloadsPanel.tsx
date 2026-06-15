@@ -1,4 +1,5 @@
 import { IconCheck, IconDownload, IconX } from "../Icons";
+import { useTranslation } from "../i18n";
 import type { DownloadToast } from "../appCore";
 
 type Props = {
@@ -18,28 +19,29 @@ export function DownloadsPanel({
   onOpenFile,
   onRevealFolder,
 }: Props) {
+  const { t } = useTranslation();
   if (!open) return null;
 
   return (
-    <div className="downloads-panel" role="dialog" aria-label="Tải xuống">
+    <div className="downloads-panel" role="dialog" aria-label={t("downloads.title")}>
       <header className="downloads-panel-header">
-        <h3 className="modal-title">Tải xuống</h3>
+        <h3 className="modal-title">{t("downloads.title")}</h3>
         <div className="downloads-panel-actions">
           {items.length > 0 && (
             <button
               type="button"
               className="modal-btn"
               onClick={onClearAll}
-              title="Xóa danh sách"
+              title={t("downloads.clearListTitle")}
             >
-              Xóa hết
+              {t("downloads.clearAll")}
             </button>
           )}
           <button
             type="button"
             className="icon-button"
             onClick={onClose}
-            aria-label="Đóng"
+            aria-label={t("common.close")}
           >
             <IconX size={14} />
           </button>
@@ -47,7 +49,7 @@ export function DownloadsPanel({
       </header>
 
       {items.length === 0 ? (
-        <div className="downloads-empty">Chưa có file nào được tải.</div>
+        <div className="downloads-empty">{t("downloads.empty")}</div>
       ) : (
         <ul className="downloads-list">
           {[...items]
@@ -73,17 +75,17 @@ export function DownloadsPanel({
                         <span className="downloads-progress">
                           <span className="downloads-progress-bar" />
                         </span>
-                        <span className="downloads-status downloading">Đang tải…</span>
+                        <span className="downloads-status downloading">{t("downloads.downloading")}</span>
                       </>
                     )}
                     {item.status === "success" && (
-                      <span className="downloads-status success">Hoàn tất</span>
+                      <span className="downloads-status success">{t("downloads.completed")}</span>
                     )}
                     {item.status === "error" && (
-                      <span className="downloads-status error">Lỗi</span>
+                      <span className="downloads-status error">{t("downloads.error")}</span>
                     )}
                     {item.status === "cancelled" && (
-                      <span className="downloads-status">Đã hủy</span>
+                      <span className="downloads-status">{t("downloads.cancelled")}</span>
                     )}
                   </div>
                   {item.status === "success" && item.path && (
@@ -93,7 +95,7 @@ export function DownloadsPanel({
                         className="download-toast-link"
                         onClick={() => onOpenFile(item.path!)}
                       >
-                        Mở file
+                        {t("downloads.openFile")}
                       </button>
                       <span className="download-toast-sep">·</span>
                       <button
@@ -101,7 +103,7 @@ export function DownloadsPanel({
                         className="download-toast-link"
                         onClick={() => onRevealFolder(item.path!)}
                       >
-                        Mở folder
+                        {t("downloads.openFolder")}
                       </button>
                     </div>
                   )}

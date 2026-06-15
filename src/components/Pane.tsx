@@ -18,6 +18,7 @@ import {
   type ChatTab,
   type Profile,
 } from "../appCore";
+import { useTranslation } from "../i18n";
 
 type PaneDragRef = MutableRefObject<{
   paneId: string;
@@ -135,6 +136,7 @@ export function Pane({
   moveTabAcrossPanes,
   detachTabToNewPane,
 }: PaneProps) {
+  const { t } = useTranslation();
   const activeTab = pane.tabs.find((tab) => tab.id === pane.activeTabId) ?? pane.tabs[0];
   const activeUrl = normalizeUrl(activeTab.loadedUrl);
   const activeDisplayUrl = getDisplayUrl(activeTab);
@@ -151,7 +153,7 @@ export function Pane({
     >
       <nav
         className="tab-strip"
-        aria-label={`Tab của ${pane.title}`}
+        aria-label={t("pane.tabsOf", { title: pane.title })}
         onPointerDown={(event) => {
           if (focusedPaneId || event.button !== 0 || isPaneDragControl(event.target)) {
             return;
@@ -416,7 +418,7 @@ export function Pane({
                       removeTab(pane.id, tab.id);
                     }
                   }}
-                  aria-label={`Xóa ${tabTitle}`}
+                  aria-label={t("pane.closeTab", { title: tabTitle })}
                 >
                   <IconX size={11} />
                 </span>
@@ -424,26 +426,26 @@ export function Pane({
             );
           })}
         </div>
-        <div className="tab-actions" aria-label="Điều khiển split chat">
+        <div className="tab-actions" aria-label={t("pane.splitControls")}>
           <button
             className="icon-button"
             onClick={() => addTab(pane.id)}
-            aria-label="Thêm tab"
+            aria-label={t("pane.addTab")}
           >
             <IconPlus size={13} />
           </button>
           <button
             className="icon-button"
             onClick={() => setFocusedPaneId(isFocused ? null : pane.id)}
-            aria-label={isFocused ? "Thu nhỏ pane" : "Phóng to pane"}
-            title={isFocused ? "Thu nhỏ" : "Phóng to"}
+            aria-label={isFocused ? t("pane.minimizePane") : t("pane.maximizePane")}
+            title={isFocused ? t("pane.minimize") : t("pane.maximize")}
           >
             {isFocused ? <IconMinimize size={13} /> : <IconMaximize size={13} />}
           </button>
           <button
             className="icon-button danger"
             onClick={() => removePane(pane.id)}
-            aria-label="Đóng split chat"
+            aria-label={t("pane.closeSplit")}
           >
             <IconX size={13} />
           </button>
@@ -452,32 +454,32 @@ export function Pane({
 
       <section className="terminal-view">
         <div className="terminal-meta">
-          <div className="browser-controls" aria-label="Điều hướng web">
+          <div className="browser-controls" aria-label={t("pane.webNav")}>
             <button
               type="button"
               onClick={() => navigateActiveWebview(pane.id, activeTab, "back")}
-              aria-label="Lùi"
+              aria-label={t("pane.back")}
             >
               <IconArrowLeft size={13} />
             </button>
             <button
               type="button"
               onClick={() => navigateActiveWebview(pane.id, activeTab, "forward")}
-              aria-label="Tiến"
+              aria-label={t("pane.forward")}
             >
               <IconArrowRight size={13} />
             </button>
             <button
               type="button"
               onClick={() => navigateActiveWebview(pane.id, activeTab, "reload")}
-              aria-label="Tải lại"
+              aria-label={t("pane.reload")}
             >
               <IconRefresh size={12} />
             </button>
           </div>
           <div className="url-bar">
             {paneProfile && (
-              <span className="profile-chip" title={`Profile: ${paneProfile.name}`}>
+              <span className="profile-chip" title={t("pane.profileTitle", { name: paneProfile.name })}>
                 @{paneProfile.name}
               </span>
             )}
@@ -501,12 +503,12 @@ export function Pane({
                   event.currentTarget.blur();
                 }
               }}
-              aria-label="URL"
+              aria-label={t("pane.url")}
             />
           </div>
           <span className="running">
             <span className={activeTab.isLoading ? "live-dot loading" : "live-dot"} />{" "}
-            {activeTab.isLoading ? "Loading" : "Ready"}
+            {activeTab.isLoading ? t("pane.loading") : t("pane.ready")}
           </span>
         </div>
         <div
@@ -523,13 +525,11 @@ export function Pane({
             sandbox="allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts allow-downloads"
           />
           <div className="frame-fallback">
-            <span className="preview-badge">Web Preview</span>
+            <span className="preview-badge">{t("pane.webPreview")}</span>
             <h2>{activeTab.title}</h2>
-            <p>
-              Trang web không hiển thị được trong bản xem trước. Trên app desktop (Tauri), nội dung sẽ hiển thị đầy đủ.
-            </p>
+            <p>{t("pane.previewNotice")}</p>
             <a href={activeUrl} target="_blank" rel="noreferrer">
-              Mở bằng trình duyệt
+              {t("pane.openInBrowser")}
             </a>
           </div>
         </div>

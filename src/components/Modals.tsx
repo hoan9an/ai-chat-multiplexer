@@ -1,3 +1,5 @@
+import { useTranslation } from "../i18n";
+
 type TextPromptState = {
   title: string;
   initial: string;
@@ -20,6 +22,8 @@ export function TextPromptModal({
   onClose,
   onSubmit,
 }: TextPromptModalProps) {
+  const { t } = useTranslation();
+
   if (!prompt) return null;
 
   return (
@@ -52,10 +56,10 @@ export function TextPromptModal({
         />
         <div className="modal-actions">
           <button type="button" className="modal-btn" onClick={onClose}>
-            Hủy
+            {t("common.cancel")}
           </button>
           <button type="submit" className="modal-btn primary">
-            Lưu
+            {t("common.save")}
           </button>
         </div>
       </form>
@@ -77,6 +81,8 @@ export type ConfirmDialogProps = {
 };
 
 export function ConfirmDialog({ dialog, onClose }: ConfirmDialogProps) {
+  const { t } = useTranslation();
+
   if (!dialog) return null;
 
   return (
@@ -91,7 +97,7 @@ export function ConfirmDialog({ dialog, onClose }: ConfirmDialogProps) {
         <p className="modal-message">{dialog.message}</p>
         <div className="modal-actions">
           <button type="button" className="modal-btn" onClick={onClose}>
-            Hủy
+            {t("common.cancel")}
           </button>
           <button
             type="button"
@@ -101,7 +107,7 @@ export function ConfirmDialog({ dialog, onClose }: ConfirmDialogProps) {
               onClose();
             }}
           >
-            {dialog.confirmLabel ?? "OK"}
+            {dialog.confirmLabel ?? t("common.ok")}
           </button>
         </div>
       </div>

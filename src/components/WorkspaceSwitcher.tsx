@@ -1,5 +1,6 @@
 import { IconCheck, IconChevronDown, IconEdit, IconPlus, IconTrash } from "../Icons";
 import type { Workspace } from "../appCore";
+import { useTranslation } from "../i18n";
 
 type Props = {
   workspaces: Workspace[];
@@ -24,6 +25,7 @@ export function WorkspaceSwitcher({
   onRename,
   onDelete,
 }: Props) {
+  const { t } = useTranslation();
   const active = workspaces.find((ws) => ws.id === activeWorkspaceId) ?? workspaces[0];
 
   return (
@@ -32,14 +34,14 @@ export function WorkspaceSwitcher({
       open={open}
       onToggle={(event) => onOpenChange(event.currentTarget.open)}
     >
-      <summary aria-label="Chọn workspace">
+      <summary aria-label={t("workspace.choose")}>
         <span className="workspace-name">{active.name}</span>
         <span className="workspace-pane-count">
           · {activePaneCount} {activePaneCount === 1 ? "pane" : "panes"}
         </span>
         <IconChevronDown size={12} className="caret" />
       </summary>
-      <div className="preset-menu workspace-menu" role="menu" aria-label="Danh sách workspace">
+      <div className="preset-menu workspace-menu" role="menu" aria-label={t("workspace.list")}>
         {workspaces.map((ws) => (
           <button
             key={ws.id}
@@ -71,7 +73,7 @@ export function WorkspaceSwitcher({
           <span className="workspace-dot" aria-hidden="true">
             <IconPlus size={12} />
           </span>
-          <span>New workspace</span>
+          <span>{t("workspace.newWorkspace")}</span>
         </button>
         <button
           type="button"

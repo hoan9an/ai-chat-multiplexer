@@ -35,6 +35,16 @@ vi.mock("@tauri-apps/plugin-fs", () => ({
   },
 }));
 
+const updaterCheck = vi.fn();
+vi.mock("@tauri-apps/plugin-updater", () => ({
+  check: () => updaterCheck(),
+}));
+
+const relaunchSpy = vi.fn();
+vi.mock("@tauri-apps/plugin-process", () => ({
+  relaunch: () => relaunchSpy(),
+}));
+
 let tauriRuntime = false;
 vi.mock("./appCore", async () => {
   const actual = await vi.importActual<typeof import("./appCore")>("./appCore");
@@ -106,6 +116,8 @@ describe("useBackupAndUpdates", () => {
   beforeEach(() => {
     tauriRuntime = false;
     invokeSpy.mockReset();
+    updaterCheck.mockReset();
+    relaunchSpy.mockReset();
     rejectingCommands.clear();
     writeTextFileExportNull = false;
     readTextFileExportNull = false;
@@ -190,6 +202,124 @@ describe("useBackupAndUpdates", () => {
       });
 
       expect(result.current.updateStatus).toEqual({ kind: "error", message: "offline" });
+    });
+  });
+
+  describe("checkForUpdates (Tauri updater)", () => {
+    beforeEach(() => {
+      tauriRuntime = true;
+    });
+
+    it("uses the updater check() and reports 'available' with the new version", async () => {
+      updaterCheck.mockResolvedValue({ version: "2.0.0" });
+      const fetchSpy = vi.spyOn(globalThis, "fetch");
+      const { result } = setupHook();
+
+      await act(async () => {
+        await result.current.checkForUpdates();
+      });
+
+      expect(updaterCheck).toHaveBeenCalledTimes(1);
+      // Desktop path must NOT hit the GitHub REST API.
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(result.current.updateStatus.kind).toBe("available");
+      if (result.current.updateStatus.kind === "available") {
+        expect(result.current.updateStatus.latest).toBe("2.0.0");
+      }
+    });
+
+    it("reports 'current' when updater check() resolves null", async () => {
+      updaterCheck.mockResolvedValue(null);
+      const { result } = setupHook();
+
+      await act(async () => {
+        await result.current.checkForUpdates();
+      });
+
+      expect(result.current.updateStatus).toEqual({ kind: "current" });
+    });
+
+    it("reports 'error' when updater check() rejects", async () => {
+      updaterCheck.mockRejectedValue(new Error("endpoint 404"));
+      const { result } = setupHook();
+
+      await act(async () => {
+        await result.current.checkForUpdates();
+      });
+
+      expect(result.current.updateStatus).toEqual({
+        kind: "error",
+        message: "endpoint 404",
+      });
+    });
+  });
+
+  describe("downloadAndInstallUpdate (Tauri updater)", () => {
+    beforeEach(() => {
+      tauriRuntime = true;
+    });
+
+    it("does nothing when no update was staged by a prior check", async () => {
+      const { result } = setupHook();
+
+      await act(async () => {
+        await result.current.downloadAndInstallUpdate();
+      });
+
+      expect(relaunchSpy).not.toHaveBeenCalled();
+      expect(result.current.updateStatus).toEqual({ kind: "idle" });
+    });
+
+    it("tracks progress through downloading → installing then relaunches", async () => {
+      const downloadAndInstall = vi.fn(
+        async (cb: (event: { event: string; data?: Record<string, number> }) => void) => {
+          cb({ event: "Started", data: { contentLength: 200 } });
+          cb({ event: "Progress", data: { chunkLength: 100 } });
+          cb({ event: "Progress", data: { chunkLength: 100 } });
+          cb({ event: "Finished" });
+        },
+      );
+      updaterCheck.mockResolvedValue({ version: "2.0.0", downloadAndInstall });
+      relaunchSpy.mockResolvedValue(undefined);
+      const { result } = setupHook();
+
+      await act(async () => {
+        await result.current.checkForUpdates();
+      });
+
+      await act(async () => {
+        await result.current.downloadAndInstallUpdate();
+      });
+
+      expect(downloadAndInstall).toHaveBeenCalledTimes(1);
+      expect(relaunchSpy).toHaveBeenCalledTimes(1);
+      // After the install completes we briefly mark readyToInstall before relaunch.
+      expect(result.current.updateStatus).toEqual({
+        kind: "readyToInstall",
+        latest: "2.0.0",
+      });
+    });
+
+    it("reports 'error' and does not relaunch when install/verification fails", async () => {
+      const downloadAndInstall = vi.fn(async () => {
+        throw new Error("signature verification failed");
+      });
+      updaterCheck.mockResolvedValue({ version: "2.0.0", downloadAndInstall });
+      const { result } = setupHook();
+
+      await act(async () => {
+        await result.current.checkForUpdates();
+      });
+
+      await act(async () => {
+        await result.current.downloadAndInstallUpdate();
+      });
+
+      expect(relaunchSpy).not.toHaveBeenCalled();
+      expect(result.current.updateStatus).toEqual({
+        kind: "error",
+        message: "signature verification failed",
+      });
     });
   });
 

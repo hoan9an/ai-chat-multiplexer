@@ -1,5 +1,6 @@
 import { IconCheck, IconDownload, IconX } from "../Icons";
 import type { DownloadToast } from "../appCore";
+import { useTranslation } from "../i18n";
 
 type Props = {
   toasts: DownloadToast[];
@@ -9,6 +10,8 @@ type Props = {
 };
 
 export function DownloadToastStack({ toasts, onDismiss, onOpenFile, onRevealFolder }: Props) {
+  const { t } = useTranslation();
+
   if (toasts.length === 0) return null;
 
   return (
@@ -27,10 +30,10 @@ export function DownloadToastStack({ toasts, onDismiss, onOpenFile, onRevealFold
           <div className="download-toast-body">
             <div className="download-toast-title">
               {toast.status === "downloading"
-                ? "Đang tải…"
+                ? t("toast.downloading")
                 : toast.status === "success"
-                  ? "Đã tải xong"
-                  : "Tải lỗi"}
+                  ? t("toast.success")
+                  : t("toast.error")}
             </div>
             <div className="download-toast-name" title={toast.path ?? toast.fileName}>
               {toast.fileName}
@@ -42,7 +45,7 @@ export function DownloadToastStack({ toasts, onDismiss, onOpenFile, onRevealFold
                   className="download-toast-link"
                   onClick={() => onOpenFile(toast.path!)}
                 >
-                  Mở file
+                  {t("downloads.openFile")}
                 </button>
                 <span className="download-toast-sep">·</span>
                 <button
@@ -50,7 +53,7 @@ export function DownloadToastStack({ toasts, onDismiss, onOpenFile, onRevealFold
                   className="download-toast-link"
                   onClick={() => onRevealFolder(toast.path!)}
                 >
-                  Mở folder
+                  {t("downloads.openFolder")}
                 </button>
               </div>
             )}
@@ -59,7 +62,7 @@ export function DownloadToastStack({ toasts, onDismiss, onOpenFile, onRevealFold
             type="button"
             className="download-toast-close"
             onClick={() => onDismiss(toast.id)}
-            aria-label="Đóng"
+            aria-label={t("common.close")}
           >
             <IconX size={12} />
           </button>

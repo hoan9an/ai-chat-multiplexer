@@ -29,6 +29,7 @@ export interface AppOverlaysProps {
   setTheme: (theme: ThemeMode) => void;
   updateStatus: UpdateStatus;
   checkForUpdates: () => void;
+  downloadAndInstallUpdate: () => void;
   openReleasePage: (url: string) => void;
   backupBusy: BackupBusy;
   exportConfigJson: () => void;
@@ -60,6 +61,7 @@ export function AppOverlays(props: AppOverlaysProps) {
     setTheme,
     updateStatus,
     checkForUpdates,
+    downloadAndInstallUpdate,
     openReleasePage,
     backupBusy,
     exportConfigJson,
@@ -94,6 +96,7 @@ export function AppOverlays(props: AppOverlaysProps) {
         onThemeChange={setTheme}
         updateStatus={updateStatus}
         onCheckForUpdates={checkForUpdates}
+        onDownloadAndInstall={downloadAndInstallUpdate}
         onOpenReleasePage={openReleasePage}
         backupBusy={backupBusy}
         onExportConfig={exportConfigJson}

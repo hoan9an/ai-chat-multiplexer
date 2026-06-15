@@ -60,6 +60,7 @@ function App() {
     updateStatus,
     backupBusy,
     checkForUpdates,
+    downloadAndInstallUpdate,
     openReleasePage,
     exportConfigJson,
     importConfigJson,
@@ -220,6 +221,7 @@ function App() {
         setTheme={setTheme}
         updateStatus={updateStatus}
         checkForUpdates={checkForUpdates}
+        downloadAndInstallUpdate={downloadAndInstallUpdate}
         openReleasePage={openReleasePage}
         backupBusy={backupBusy}
         exportConfigJson={exportConfigJson}

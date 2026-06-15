@@ -25,6 +25,7 @@ function defaultProps(overrides: Partial<SettingsModalProps> = {}): SettingsModa
     onThemeChange: vi.fn(),
     updateStatus: { kind: "idle" },
     onCheckForUpdates: vi.fn(),
+    onDownloadAndInstall: vi.fn(),
     onOpenReleasePage: vi.fn(),
     backupBusy: "idle",
     onExportConfig: vi.fn(),
@@ -149,6 +150,43 @@ describe("SettingsModal", () => {
     expect(screen.getByText(/v9\.9\.9/)).toBeDefined();
     fireEvent.click(screen.getByRole("button", { name: /Mở trang tải/ }));
     expect(props.onOpenReleasePage).toHaveBeenCalledWith("https://r");
+  });
+
+  it("shows 'Download & install' and triggers onDownloadAndInstall in Tauri runtime", () => {
+    tauriRuntime = true;
+    const props = defaultProps({
+      updateStatus: { kind: "available", latest: "9.9.9", releaseUrl: "https://r" },
+    });
+    render(<SettingsModal {...props} />);
+    fireEvent.click(screen.getByRole("button", { name: /Tải & cài đặt/ }));
+    expect(props.onDownloadAndInstall).toHaveBeenCalledTimes(1);
+    expect(props.onOpenReleasePage).not.toHaveBeenCalled();
+  });
+
+  it("shows download progress when updateStatus is downloading", () => {
+    render(
+      <SettingsModal
+        {...defaultProps({ updateStatus: { kind: "downloading", latest: "9.9.9", progress: 42 } })}
+      />,
+    );
+    expect(screen.getByText(/42%/)).toBeDefined();
+    expect(screen.getByText("Đang tải…")).toBeDefined();
+  });
+
+  it("shows installing notice when updateStatus is installing", () => {
+    render(
+      <SettingsModal {...defaultProps({ updateStatus: { kind: "installing", latest: "9.9.9" } })} />,
+    );
+    expect(screen.getByText("Đang cài đặt…")).toBeDefined();
+  });
+
+  it("shows restarting notice when updateStatus is readyToInstall", () => {
+    render(
+      <SettingsModal
+        {...defaultProps({ updateStatus: { kind: "readyToInstall", latest: "9.9.9" } })}
+      />,
+    );
+    expect(screen.getByText("Đang khởi động lại…")).toBeDefined();
   });
 
   it("shows error message when updateStatus is error", () => {
