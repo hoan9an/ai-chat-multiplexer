@@ -20,7 +20,51 @@ permissions:
   contents: write
 
 jobs:
-  release:
+  # Create a single draft release FIRST so the parallel build matrix uploads its
+  # bundles into one shared draft. Letting each matrix job create its own release
+  # via tauri-action races and produces duplicate drafts for the same tag.
+  create-release:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    outputs:
+      release_id: ${{ steps.create-release.outputs.release_id }}
+    steps:
+      - name: Create or reuse draft release
+        id: create-release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = context.ref.replace('refs/tags/', '');
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            // Reuse an existing release for this tag if one is already present,
+            // otherwise create a fresh draft. This keeps re-runs idempotent.
+            let release;
+            try {
+              const existing = await github.rest.repos.getReleaseByTag({ owner, repo, tag });
+              release = existing.data;
+            } catch (error) {
+              if (error.status !== 404) {
+                throw error;
+              }
+              const created = await github.rest.repos.createRelease({
+                owner,
+                repo,
+                tag_name: tag,
+                name: `AI Chat Multiplexer ${tag}`,
+                body: 'See the assets below to download and install this version.',
+                draft: true,
+                prerelease: false,
+              });
+              release = created.data;
+            }
+
+            core.setOutput('release_id', release.id);
+
+  build-tauri:
+    needs: create-release
     strategy:
       fail-fast: false
       matrix:
@@ -75,11 +119,9 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: "AI Chat Multiplexer ${{ github.ref_name }}"
-          releaseBody: "See the assets below to download and install this version."
-          releaseDraft: true
-          prerelease: false
+          # Upload into the single draft created by the create-release job so all
+          # four matrix builds (and their updater manifests) land in one release.
+          releaseId: ${{ needs.create-release.outputs.release_id }}
           # Generates the updater `latest.json` manifest alongside the bundles so
           # the configured updater endpoint resolves.
           includeUpdaterJson: true
