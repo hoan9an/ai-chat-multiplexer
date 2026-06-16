@@ -204,7 +204,7 @@ export function AppHeader({
           className="theme-toggle"
           onClick={() => setIsSettingsOpen(true)}
           aria-label={t("header.openSettings")}
-          title="Settings"
+          title={t("header.settings")}
         >
           <IconSettings size={14} />
         </button>

@@ -10,6 +10,7 @@ export const vi = {
   "common.cancel": "Hủy",
   "common.save": "Lưu",
   "common.ok": "OK",
+  "common.delete": "Xóa",
 
   // Settings modal
   "settings.title": "Settings",
@@ -126,14 +127,27 @@ export const vi = {
   "header.newProfileTitle": "Profile mới",
   "header.newProfilePlaceholder": "vd: Work, Personal",
   "header.openSettings": "Mở cài đặt",
+  "header.settings": "Cài đặt",
   "header.brand": "AI Multiplexer",
+
+  // Profile actions (dialogs)
+  "profile.renameTitle": "Đổi tên profile",
+  "profile.newNamePlaceholder": "Tên mới",
+  "profile.inUseTitle": "Profile đang được dùng",
+  "profile.inUseMessage": "Profile này đang được dùng bởi một pane đang mở. Đóng pane trước khi xóa.",
+  "profile.deleteTitle": "Xóa profile \"{name}\"?",
+  "profile.deleteMessage": "Toàn bộ cookie và đăng nhập của profile này sẽ bị xóa vĩnh viễn.",
 
   // Workspace switcher
   "workspace.choose": "Chọn workspace",
   "workspace.list": "Danh sách workspace",
-  "workspace.newWorkspace": "New workspace",
-  "workspace.renameCurrent": "Rename current",
-  "workspace.deleteCurrent": "Delete current",
+  "workspace.newWorkspace": "Workspace mới",
+  "workspace.renameCurrent": "Đổi tên workspace",
+  "workspace.deleteCurrent": "Xóa workspace",
+  "workspace.paneCount": "{count} pane",
+  "workspace.renameTitle": "Đổi tên workspace",
+  "workspace.deleteTitle": "Xóa workspace \"{name}\"?",
+  "workspace.deleteMessage": "Tất cả pane bên trong sẽ bị đóng. Profile và session vẫn được giữ lại.",
 };
 
 export type TranslationKey = keyof typeof vi;

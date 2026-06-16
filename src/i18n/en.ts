@@ -6,6 +6,7 @@ export const en: Dictionary = {
   "common.cancel": "Cancel",
   "common.save": "Save",
   "common.ok": "OK",
+  "common.delete": "Delete",
 
   // Settings modal
   "settings.title": "Settings",
@@ -122,7 +123,16 @@ export const en: Dictionary = {
   "header.newProfileTitle": "New profile",
   "header.newProfilePlaceholder": "e.g. Work, Personal",
   "header.openSettings": "Open settings",
+  "header.settings": "Settings",
   "header.brand": "AI Multiplexer",
+
+  // Profile actions (dialogs)
+  "profile.renameTitle": "Rename profile",
+  "profile.newNamePlaceholder": "New name",
+  "profile.inUseTitle": "Profile in use",
+  "profile.inUseMessage": "This profile is being used by an open pane. Close the pane before deleting.",
+  "profile.deleteTitle": "Delete profile \"{name}\"?",
+  "profile.deleteMessage": "All cookies and logins for this profile will be permanently deleted.",
 
   // Workspace switcher
   "workspace.choose": "Choose workspace",
@@ -130,4 +140,8 @@ export const en: Dictionary = {
   "workspace.newWorkspace": "New workspace",
   "workspace.renameCurrent": "Rename current",
   "workspace.deleteCurrent": "Delete current",
+  "workspace.paneCount": "{count} panes",
+  "workspace.renameTitle": "Rename workspace",
+  "workspace.deleteTitle": "Delete workspace \"{name}\"?",
+  "workspace.deleteMessage": "All panes inside will be closed. Profiles and sessions are kept.",
 };

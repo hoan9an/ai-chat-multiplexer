@@ -37,7 +37,7 @@ export function WorkspaceSwitcher({
       <summary aria-label={t("workspace.choose")}>
         <span className="workspace-name">{active.name}</span>
         <span className="workspace-pane-count">
-          · {activePaneCount} {activePaneCount === 1 ? "pane" : "panes"}
+          · {t("workspace.paneCount", { count: activePaneCount })}
         </span>
         <IconChevronDown size={12} className="caret" />
       </summary>
@@ -87,7 +87,7 @@ export function WorkspaceSwitcher({
           <span className="workspace-dot" aria-hidden="true">
             <IconEdit size={12} />
           </span>
-          <span>Rename current</span>
+          <span>{t("workspace.renameCurrent")}</span>
         </button>
         <button
           type="button"
@@ -102,7 +102,7 @@ export function WorkspaceSwitcher({
           <span className="workspace-dot" aria-hidden="true">
             <IconTrash size={12} />
           </span>
-          <span>Delete current</span>
+          <span>{t("workspace.deleteCurrent")}</span>
         </button>
       </div>
     </details>

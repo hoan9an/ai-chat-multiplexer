@@ -6,6 +6,7 @@ export const zh: Dictionary = {
   "common.cancel": "取消",
   "common.save": "保存",
   "common.ok": "确定",
+  "common.delete": "删除",
 
   // Settings modal
   "settings.title": "设置",
@@ -107,22 +108,35 @@ export const zh: Dictionary = {
   "header.layoutControls": "布局控制",
   "header.chooseLayout": "选择布局",
   "header.focus": "Focus",
-  "header.newPane": "New pane",
+  "header.newPane": "新建窗格",
   "header.chooseProfile": "为新窗格选择配置文件",
   "header.renameProfile": "重命名 {name}",
   "header.rename": "重命名",
   "header.deleteProfile": "删除 {name}",
   "header.deleteProfileTitle": "删除配置文件",
-  "header.newProfile": "New profile…",
+  "header.newProfile": "新建配置文件…",
   "header.newProfileTitle": "新建配置文件",
   "header.newProfilePlaceholder": "例如：Work、Personal",
   "header.openSettings": "打开设置",
+  "header.settings": "设置",
   "header.brand": "AI Multiplexer",
+
+  // Profile actions (dialogs)
+  "profile.renameTitle": "重命名配置文件",
+  "profile.newNamePlaceholder": "新名称",
+  "profile.inUseTitle": "配置文件正在使用中",
+  "profile.inUseMessage": "该配置文件正在被一个打开的窗格使用。请先关闭该窗格再删除。",
+  "profile.deleteTitle": "删除配置文件 \"{name}\"？",
+  "profile.deleteMessage": "该配置文件的所有 Cookie 和登录信息将被永久删除。",
 
   // Workspace switcher
   "workspace.choose": "选择工作区",
   "workspace.list": "工作区列表",
-  "workspace.newWorkspace": "New workspace",
-  "workspace.renameCurrent": "Rename current",
-  "workspace.deleteCurrent": "Delete current",
+  "workspace.newWorkspace": "新建工作区",
+  "workspace.renameCurrent": "重命名工作区",
+  "workspace.deleteCurrent": "删除工作区",
+  "workspace.paneCount": "{count} 个窗格",
+  "workspace.renameTitle": "重命名工作区",
+  "workspace.deleteTitle": "删除工作区 \"{name}\"？",
+  "workspace.deleteMessage": "其中的所有窗格都将关闭。配置文件和会话将被保留。",
 };

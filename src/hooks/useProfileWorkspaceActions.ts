@@ -9,6 +9,7 @@ import {
   type Workspace,
 } from "../appCore";
 import { getNewTabUrl, NEW_TAB_TITLE } from "../newtab";
+import { useTranslation } from "../i18n";
 import type { ConfirmDialogOptions, TextPromptOptions } from "../types/dialogs";
 
 export interface UseProfileWorkspaceActionsArgs {
@@ -42,6 +43,7 @@ export function useProfileWorkspaceActions({
   openTextPrompt,
   updateActiveWorkspace,
 }: UseProfileWorkspaceActionsArgs): ProfileWorkspaceActions {
+  const { t } = useTranslation();
   function addBlankPaneWithProfile(profile: Profile) {
     const paneId = createId("pane");
     const tabId = createId("tab");
@@ -89,9 +91,9 @@ export function useProfileWorkspaceActions({
     const profile = state.profiles.find((p) => p.id === profileId);
     if (!profile) return;
     openTextPrompt({
-      title: `Đổi tên profile`,
+      title: t("profile.renameTitle"),
       initial: profile.name,
-      placeholder: "Tên mới",
+      placeholder: t("profile.newNamePlaceholder"),
       onSubmit: (next) => {
         if (next === profile.name) return;
         setState((current) => ({
@@ -122,18 +124,18 @@ export function useProfileWorkspaceActions({
     );
     if (inUse) {
       setConfirmDialog({
-        title: "Profile đang được dùng",
-        message: "Profile này đang được dùng bởi một pane đang mở. Đóng pane trước khi xóa.",
-        confirmLabel: "OK",
+        title: t("profile.inUseTitle"),
+        message: t("profile.inUseMessage"),
+        confirmLabel: t("common.ok"),
         onConfirm: () => undefined,
       });
       return;
     }
 
     setConfirmDialog({
-      title: `Xóa profile "${profile.name}"?`,
-      message: "Toàn bộ cookie và đăng nhập của profile này sẽ bị xóa vĩnh viễn.",
-      confirmLabel: "Xóa",
+      title: t("profile.deleteTitle", { name: profile.name }),
+      message: t("profile.deleteMessage"),
+      confirmLabel: t("common.delete"),
       danger: true,
       onConfirm: () => {
         if (isTauriRuntime()) {
@@ -169,9 +171,9 @@ export function useProfileWorkspaceActions({
   function renameActiveWorkspace() {
     const currentName = activeWorkspace.name;
     openTextPrompt({
-      title: "Đổi tên workspace",
+      title: t("workspace.renameTitle"),
       initial: currentName,
-      placeholder: "Tên mới",
+      placeholder: t("profile.newNamePlaceholder"),
       onSubmit: (next) => {
         if (next === currentName) return;
         updateActiveWorkspace((workspace) => ({ ...workspace, name: next }));
@@ -183,9 +185,9 @@ export function useProfileWorkspaceActions({
     if (state.workspaces.length <= 1) return;
 
     setConfirmDialog({
-      title: `Xóa workspace "${activeWorkspace.name}"?`,
-      message: "Tất cả pane bên trong sẽ bị đóng. Profile và session vẫn được giữ lại.",
-      confirmLabel: "Xóa",
+      title: t("workspace.deleteTitle", { name: activeWorkspace.name }),
+      message: t("workspace.deleteMessage"),
+      confirmLabel: t("common.delete"),
       danger: true,
       onConfirm: () => {
         setFocusedPaneId(null);

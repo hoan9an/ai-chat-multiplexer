@@ -52,7 +52,7 @@ describe("WorkspaceSwitcher", () => {
 
   it("uses plural label when activePaneCount !== 1", () => {
     render(<WorkspaceSwitcher {...defaultProps({ activePaneCount: 3 })} />);
-    expect(screen.getByText(/· 3 panes$/)).toBeDefined();
+    expect(screen.getByText(/· 3 pane$/)).toBeDefined();
   });
 
   it("propagates open state via onOpenChange when details toggles", () => {
@@ -83,7 +83,7 @@ describe("WorkspaceSwitcher", () => {
   it("calls onCreate then closes the menu", () => {
     const props = defaultProps();
     render(<WorkspaceSwitcher {...props} />);
-    fireEvent.click(screen.getByRole("menuitem", { name: /New workspace/ }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /Workspace mới/ }));
     expect(props.onCreate).toHaveBeenCalledTimes(1);
     expect(props.onOpenChange).toHaveBeenCalledWith(false);
   });
@@ -91,14 +91,14 @@ describe("WorkspaceSwitcher", () => {
   it("calls onRename when rename item is clicked", () => {
     const props = defaultProps();
     render(<WorkspaceSwitcher {...props} />);
-    fireEvent.click(screen.getByRole("menuitem", { name: /Rename current/ }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /Đổi tên workspace/ }));
     expect(props.onRename).toHaveBeenCalledTimes(1);
   });
 
   it("calls onDelete when delete item is clicked", () => {
     const props = defaultProps();
     render(<WorkspaceSwitcher {...props} />);
-    fireEvent.click(screen.getByRole("menuitem", { name: /Delete current/ }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /Xóa workspace/ }));
     expect(props.onDelete).toHaveBeenCalledTimes(1);
   });
 
@@ -108,7 +108,7 @@ describe("WorkspaceSwitcher", () => {
       activeWorkspaceId: "ws1",
     });
     render(<WorkspaceSwitcher {...props} />);
-    const del = screen.getByRole("menuitem", { name: /Delete current/ }) as HTMLButtonElement;
+    const del = screen.getByRole("menuitem", { name: /Xóa workspace/ }) as HTMLButtonElement;
     expect(del.disabled).toBe(true);
   });
 
