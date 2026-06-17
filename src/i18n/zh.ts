@@ -25,7 +25,7 @@ export const zh: Dictionary = {
   // Updates
   "update.check": "检查更新",
   "update.checking": "正在检查…",
-  "update.current": "您已是最新版本。",
+  "update.current": "暂无新更新，或您已是最新版本。",
   "update.availablePrefix": "有新版本：",
   "update.openDownload": "打开下载页",
   "update.downloadInstall": "下载并安装",
@@ -107,6 +107,7 @@ export const zh: Dictionary = {
   // App header
   "header.layoutControls": "布局控制",
   "header.chooseLayout": "选择布局",
+  "header.layoutColumns": "使用 {label} 列布局",
   "header.focus": "Focus",
   "header.newPane": "新建窗格",
   "header.chooseProfile": "为新窗格选择配置文件",

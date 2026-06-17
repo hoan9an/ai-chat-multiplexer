@@ -53,17 +53,17 @@ describe("AppHeader", () => {
     props.activeWorkspace = makeWorkspace("ws1", "First", 3);
     render(<AppHeader {...props} />);
 
-    const btn = screen.getByRole("button", { name: "Use 3 column layout" });
+    const btn = screen.getByRole("button", { name: "Dùng bố cục 3 cột" });
     expect(btn.className).toContain("active");
 
-    const focus = screen.getByRole("button", { name: "Use Focus column layout" });
+    const focus = screen.getByRole("button", { name: "Dùng bố cục Focus cột" });
     expect(focus.className).not.toContain("active");
   });
 
   it("calls setColumns when a layout button is clicked", () => {
     const props = defaultProps();
     render(<AppHeader {...props} />);
-    fireEvent.click(screen.getByRole("button", { name: "Use 4 column layout" }));
+    fireEvent.click(screen.getByRole("button", { name: "Dùng bố cục 4 cột" }));
     expect(props.setColumns).toHaveBeenCalledWith(4);
   });
 

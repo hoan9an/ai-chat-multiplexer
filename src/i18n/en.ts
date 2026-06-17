@@ -25,7 +25,7 @@ export const en: Dictionary = {
   // Updates
   "update.check": "Check for updates",
   "update.checking": "Checking…",
-  "update.current": "You are on the latest version.",
+  "update.current": "No new updates, or you are on the latest version.",
   "update.availablePrefix": "New version available: ",
   "update.openDownload": "Open download page",
   "update.downloadInstall": "Download & install",
@@ -112,8 +112,9 @@ export const en: Dictionary = {
   // App header
   "header.layoutControls": "Layout controls",
   "header.chooseLayout": "Choose layout",
+  "header.layoutColumns": "Use {label} column layout",
   "header.focus": "Focus",
-  "header.newPane": "New pane",
+  "header.newPane": "New Pane",
   "header.chooseProfile": "Choose a profile for the new pane",
   "header.renameProfile": "Rename {name}",
   "header.rename": "Rename",

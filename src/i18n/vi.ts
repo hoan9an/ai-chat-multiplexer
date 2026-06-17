@@ -29,7 +29,7 @@ export const vi = {
   // Updates
   "update.check": "Kiểm tra cập nhật",
   "update.checking": "Đang kiểm tra…",
-  "update.current": "Bạn đang dùng phiên bản mới nhất.",
+  "update.current": "Chưa có bản cập nhật mới hoặc bạn đã ở phiên bản mới nhất.",
   "update.availablePrefix": "Có bản mới: ",
   "update.openDownload": "Mở trang tải",
   "update.downloadInstall": "Tải & cài đặt",
@@ -116,8 +116,9 @@ export const vi = {
   // App header
   "header.layoutControls": "Điều khiển layout",
   "header.chooseLayout": "Chọn bố cục",
+  "header.layoutColumns": "Dùng bố cục {label} cột",
   "header.focus": "Focus",
-  "header.newPane": "New pane",
+  "header.newPane": "New Pane",
   "header.chooseProfile": "Chọn profile cho pane mới",
   "header.renameProfile": "Đổi tên {name}",
   "header.rename": "Đổi tên",

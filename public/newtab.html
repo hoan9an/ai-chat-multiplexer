@@ -197,7 +197,7 @@
       </svg>
       <span class="wordmark">AI Multiplexer</span>
     </div>
-    <p class="tagline">Mở nhanh một dịch vụ AI</p>
+    <p class="tagline" id="tagline">Mở nhanh một dịch vụ AI</p>
     <form class="search" id="search-form" role="search" aria-label="Tìm kiếm trên Google">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <circle cx="11" cy="11" r="8"></circle>
@@ -205,7 +205,7 @@
       </svg>
       <input id="search-input" type="text" placeholder="Tìm trên Google hoặc nhập địa chỉ" autocomplete="off" autofocus />
     </form>
-    <nav class="grid" aria-label="Quick links">
+    <nav class="grid" id="quick-links" aria-label="Quick links">
       <a class="card" href="https://chatgpt.com" data-target="https://chatgpt.com">
         <span class="logo-wrap"><img src="https://www.google.com/s2/favicons?domain=chatgpt.com&sz=64" alt="" referrerpolicy="no-referrer"/></span>
         <span class="name">ChatGPT</span>
@@ -231,9 +231,66 @@
         <span class="name">Grok</span>
       </a>
     </nav>
-    <p class="footer">Hoặc nhập địa chỉ tùy ý vào ô URL phía trên</p>
+    <p class="footer" id="footer">Hoặc nhập địa chỉ tùy ý vào ô URL phía trên</p>
   </main>
   <script>
+    // The new-tab page can run in an isolated native webview, so the active
+    // language is passed through the URL instead of localStorage. Keep these
+    // strings in sync with the keys in src/i18n.
+    var I18N = {
+      vi: {
+        title: "New Tab — AI Multiplexer",
+        tagline: "Mở nhanh một dịch vụ AI",
+        searchLabel: "Tìm kiếm trên Google",
+        searchPlaceholder: "Tìm trên Google hoặc nhập địa chỉ",
+        quickLinks: "Liên kết nhanh",
+        footer: "Hoặc nhập địa chỉ tùy ý vào ô URL phía trên",
+      },
+      en: {
+        title: "New Tab — AI Multiplexer",
+        tagline: "Quickly open an AI service",
+        searchLabel: "Search Google",
+        searchPlaceholder: "Search Google or type a URL",
+        quickLinks: "Quick links",
+        footer: "Or type any address into the URL bar above",
+      },
+      zh: {
+        title: "新标签页 — AI Multiplexer",
+        tagline: "快速打开一个 AI 服务",
+        searchLabel: "使用 Google 搜索",
+        searchPlaceholder: "用 Google 搜索或输入网址",
+        quickLinks: "快速链接",
+        footer: "或在上方地址栏输入任意网址",
+      },
+    };
+
+    (function applyLang() {
+      // This page runs in an isolated native webview (its own data_directory per
+      // profile), so it cannot read the app's localStorage. The active language
+      // is passed in via the ?lang= query param built by the main window.
+      var lang = "vi";
+      try {
+        var params = new URLSearchParams(window.location.search);
+        var q = params.get("lang");
+        if (q === "vi" || q === "en" || q === "zh") lang = q;
+      } catch (e) {
+        // ignore URL parsing errors
+      }
+      var dict = I18N[lang] || I18N.vi;
+      document.documentElement.lang = lang;
+      document.title = dict.title;
+      var tagline = document.getElementById("tagline");
+      if (tagline) tagline.textContent = dict.tagline;
+      var form = document.getElementById("search-form");
+      if (form) form.setAttribute("aria-label", dict.searchLabel);
+      var input = document.getElementById("search-input");
+      if (input) input.setAttribute("placeholder", dict.searchPlaceholder);
+      var quickLinks = document.getElementById("quick-links");
+      if (quickLinks) quickLinks.setAttribute("aria-label", dict.quickLinks);
+      var footer = document.getElementById("footer");
+      if (footer) footer.textContent = dict.footer;
+    })();
+
     function resolveAddress(input) {
       var trimmed = (input || "").trim();
       if (!trimmed) return null;

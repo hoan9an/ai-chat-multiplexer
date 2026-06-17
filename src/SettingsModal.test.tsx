@@ -139,7 +139,7 @@ describe("SettingsModal", () => {
 
   it("shows current-version notice when updateStatus is current", () => {
     render(<SettingsModal {...defaultProps({ updateStatus: { kind: "current" } })} />);
-    expect(screen.getByText(/Bạn đang dùng phiên bản mới nhất/)).toBeDefined();
+    expect(screen.getByText(/Chưa có bản cập nhật mới hoặc bạn đã ở phiên bản mới nhất/)).toBeDefined();
   });
 
   it("shows release link when updateStatus is available and triggers onOpenReleasePage", () => {

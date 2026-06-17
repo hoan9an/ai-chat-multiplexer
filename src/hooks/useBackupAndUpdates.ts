@@ -118,10 +118,17 @@ export function useBackupAndUpdates({
 
       await checkForUpdatesViaGithubApi();
     } catch (error) {
-      setUpdateStatus({
-        kind: "error",
-        message: error instanceof Error ? error.message : String(error),
-      });
+      const message = error instanceof Error ? error.message : String(error);
+      // The updater throws "Could not fetch a valid release JSON..." (and similar
+      // release-lookup failures) when no matching release is published yet. To the
+      // user that just means "no new version", so surface the friendly up-to-date
+      // message instead of a red technical error. Genuine failures (network drop,
+      // signature errors) keep the error treatment.
+      if (/release/i.test(message)) {
+        setUpdateStatus({ kind: "current" });
+        return;
+      }
+      setUpdateStatus({ kind: "error", message });
     }
   }
 

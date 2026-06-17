@@ -73,7 +73,7 @@ export function AppHeader({
   return (
     <header className="terminal-topbar">
       <section className="brand">
-        <div className="brand-badge" aria-label="AI Multiplexer">
+        <div className="brand-badge" aria-label={t("header.brand")}>
           <span className="brand-mark" aria-hidden="true">
             <AppLogo size={26} />
           </span>
@@ -112,7 +112,7 @@ export function AppHeader({
                 type="button"
                 className={isActiveLayout ? "segment active" : "segment"}
                 onClick={() => setColumns(item.value)}
-                aria-label={`Use ${item.label} column layout`}
+                aria-label={t("header.layoutColumns", { label: item.label })}
               >
                 {item.label}
               </button>

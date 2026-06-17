@@ -126,3 +126,26 @@ jobs:
           # the configured updater endpoint resolves.
           includeUpdaterJson: true
           args: ${{ matrix.args }}
+
+  # Flip the draft to published only AFTER all matrix builds succeed, so every
+  # bundle and the updater `latest.json` are present. Until this runs, GitHub's
+  # `releases/latest` resolves to the previous published release (which lacks
+  # `latest.json`), causing the updater to 404. Publishing here is what makes the
+  # updater endpoint resolve for end users.
+  publish-release:
+    needs: [create-release, build-tauri]
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - name: Publish the release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.updateRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: ${{ needs.create-release.outputs.release_id }},
+              draft: false,
+              make_latest: 'true',
+            });

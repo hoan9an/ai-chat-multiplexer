@@ -1,7 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { isTauriRuntime, type DownloadEventPayload, type DownloadToast } from "../appCore";
+import { useTranslation } from "../i18n";
 
 /**
  * Manages the download toast list:
@@ -12,6 +13,11 @@ import { isTauriRuntime, type DownloadEventPayload, type DownloadToast } from ".
  */
 export function useDownloadManager() {
   const [toasts, setToasts] = useState<DownloadToast[]>([]);
+  const { t } = useTranslation();
+  // Keep the latest translator in a ref so the long-lived event listener (deps
+  // []) can resolve labels in the current language without re-subscribing.
+  const tRef = useRef(t);
+  tRef.current = t;
 
   // Listen for download events from the backend.
   useEffect(() => {
@@ -63,7 +69,8 @@ export function useDownloadManager() {
 
             const id = target?.id ?? exactId ?? `${payload.label}-${payload.url}`;
             const path = payload.path ?? target?.path ?? null;
-            const fileName = path ? fileNameFromPath(path) : target?.fileName ?? "Tải xuống";
+            const fileName =
+              path ? fileNameFromPath(path) : target?.fileName ?? tRef.current("downloads.title");
             const newToast: DownloadToast = {
               id,
               status: payload.success ? "success" : "error",

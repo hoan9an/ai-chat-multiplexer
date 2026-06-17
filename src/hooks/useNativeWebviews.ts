@@ -7,12 +7,15 @@ import {
   normalizeUrl,
   type AppState,
 } from "../appCore";
+import { withNewTabLang } from "../newtab";
+import type { Lang } from "../i18n";
 
 type Args = {
   state: AppState;
   focusedPaneId: string | null;
   suspended: boolean;
   shellsRef: MutableRefObject<Record<string, HTMLDivElement | null>>;
+  lang: Lang;
 };
 
 /**
@@ -25,7 +28,7 @@ type Args = {
  *
  * The hook is a no-op outside Tauri (web preview).
  */
-export function useNativeWebviews({ state, focusedPaneId, suspended, shellsRef }: Args) {
+export function useNativeWebviews({ state, focusedPaneId, suspended, shellsRef, lang }: Args) {
   // Set of labels we currently know about, so we can close webviews that
   // disappeared between renders.
   const liveLabels = useRef<Set<string>>(new Set());
@@ -57,7 +60,7 @@ export function useNativeWebviews({ state, focusedPaneId, suspended, shellsRef }
             // currentUrl is only the URL observed from the webview (SPA routing,
             // redirects, history changes) and must not be fed back into load_url.
             const targetUrl = tab.loadedUrl || tab.url || tab.currentUrl || "";
-            const normalizedUrl = normalizeUrl(targetUrl);
+            const normalizedUrl = normalizeUrl(withNewTabLang(targetUrl, lang));
             const label = getNativeWebviewLabel(pane.id, tab);
             allLabels.add(label);
 
@@ -122,5 +125,5 @@ export function useNativeWebviews({ state, focusedPaneId, suspended, shellsRef }
       window.cancelAnimationFrame(frame);
       window.removeEventListener("resize", sync);
     };
-  }, [state, focusedPaneId, suspended, shellsRef]);
+  }, [state, focusedPaneId, suspended, shellsRef, lang]);
 }

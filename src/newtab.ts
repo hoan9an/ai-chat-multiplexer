@@ -22,3 +22,18 @@ export function isNewTabUrl(url: string): boolean {
     return url.endsWith(NEW_TAB_PATH);
   }
 }
+
+// The new-tab page runs in an isolated native webview and cannot read the app's
+// localStorage, so the active language is passed through the URL. For non-new-tab
+// URLs this is a no-op.
+export function withNewTabLang(url: string, lang: string): string {
+  if (!isNewTabUrl(url)) return url;
+  try {
+    const parsed = new URL(url, window.location.href);
+    parsed.searchParams.set("lang", lang);
+    return parsed.toString();
+  } catch {
+    const separator = url.includes("?") ? "&" : "?";
+    return `${url}${separator}lang=${encodeURIComponent(lang)}`;
+  }
+}

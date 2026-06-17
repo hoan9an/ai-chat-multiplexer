@@ -15,8 +15,10 @@ import { useNativeTabStatus } from "./hooks/useNativeTabStatus";
 import { usePaneActions } from "./hooks/usePaneActions";
 import { usePromptDialogs } from "./hooks/usePromptDialogs";
 import { useProfileWorkspaceActions } from "./hooks/useProfileWorkspaceActions";
+import { useTranslation } from "./i18n";
 
 function App() {
+  const { lang } = useTranslation();
   const { state, setState, theme, setTheme } = useAppPersistence();
   const [focusedPaneId, setFocusedPaneId] = useState<string | null>(null);
   const {
@@ -97,6 +99,7 @@ function App() {
     focusedPaneId,
     suspended: shouldSuspendNativeWebviews,
     shellsRef: webviewShells,
+    lang,
   });
 
   useFocusedPaneCleanup({ focusedPaneId, activePanes, setFocusedPaneId });

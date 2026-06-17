@@ -26,7 +26,9 @@ vi.mock("./appCore", async () => {
 });
 
 import { useNativeWebviews } from "./hooks/useNativeWebviews";
+import { getNewTabUrl } from "./newtab";
 import type { AppState, ChatPane, ChatTab, Workspace } from "./appCore";
+import type { Lang } from "./i18n";
 
 function makeTab(id: string, url: string, currentUrl?: string): ChatTab {
   return {
@@ -65,6 +67,7 @@ function setupHookWithShells(
   focusedPaneId: string | null,
   suspended: boolean,
   paneIds: string[],
+  lang: Lang = "vi",
 ) {
   // Create real DIVs so getBoundingClientRect works (returns zeros in jsdom but that's fine).
   const divs: Record<string, HTMLDivElement> = {};
@@ -74,13 +77,13 @@ function setupHookWithShells(
   });
 
   const hook = renderHook(
-    ({ s, f, sus }: { s: AppState; f: string | null; sus: boolean }) => {
+    ({ s, f, sus, l }: { s: AppState; f: string | null; sus: boolean; l: Lang }) => {
       const shellsRef = useRef<Record<string, HTMLDivElement | null>>(divs) as MutableRefObject<
         Record<string, HTMLDivElement | null>
       >;
-      useNativeWebviews({ state: s, focusedPaneId: f, suspended: sus, shellsRef });
+      useNativeWebviews({ state: s, focusedPaneId: f, suspended: sus, shellsRef, lang: l });
     },
-    { initialProps: { s: state, f: focusedPaneId, sus: suspended } },
+    { initialProps: { s: state, f: focusedPaneId, sus: suspended, l: lang } },
   );
 
   return { hook, divs };
@@ -135,6 +138,18 @@ describe("useNativeWebviews", () => {
       profileId: "prof-default",
       url: "https://a",
     });
+  });
+
+  it("adds the active language to new-tab native webview URLs", () => {
+    const newTabUrl = getNewTabUrl();
+    const state = makeState(
+      [makeWorkspace("ws1", [makePane("p1", "prof-default", [makeTab("t1", newTabUrl)])])],
+      "ws1",
+    );
+    setupHookWithShells(state, null, false, ["p1"], "zh");
+
+    const upsert = calls("native_webview_upsert")[0]?.[1] as { url: string } | undefined;
+    expect(upsert?.url).toBe(new URL("/newtab.html?lang=zh", window.location.href).toString());
   });
 
   it("hides tabs that are not the pane's activeTab", () => {
@@ -216,7 +231,7 @@ describe("useNativeWebviews", () => {
       "ws1",
     );
     act(() => {
-      hook.rerender({ s: next, f: null, sus: false });
+      hook.rerender({ s: next, f: null, sus: false, l: "vi" });
     });
 
     const loads = calls("native_webview_load_url");
@@ -249,7 +264,7 @@ describe("useNativeWebviews", () => {
       "ws1",
     );
     act(() => {
-      hook.rerender({ s: next, f: null, sus: false });
+      hook.rerender({ s: next, f: null, sus: false, l: "vi" });
     });
 
     expect(calls("native_webview_load_url")).toHaveLength(0);
@@ -277,7 +292,7 @@ describe("useNativeWebviews", () => {
       "ws1",
     );
     act(() => {
-      hook.rerender({ s: next, f: null, sus: false });
+      hook.rerender({ s: next, f: null, sus: false, l: "vi" });
     });
 
     const closes = calls("native_webview_close").map((c) => (c[1] as { label: string }).label);
@@ -334,7 +349,7 @@ describe("useNativeWebviews", () => {
       "ws1",
     );
     act(() => {
-      hook.rerender({ s: next, f: null, sus: false });
+      hook.rerender({ s: next, f: null, sus: false, l: "vi" });
     });
     await Promise.resolve();
     await Promise.resolve();
@@ -374,7 +389,7 @@ describe("useNativeWebviews", () => {
     invokeSpy.mockReset();
     // Re-render with the same state but suspended=true.
     act(() => {
-      hook.rerender({ s: initial, f: null, sus: true });
+      hook.rerender({ s: initial, f: null, sus: true, l: "vi" });
     });
     // Now tab-t1 is in liveLabels but no longer in visibleLabels — line 108 fires.
     const hideLabels = calls("native_webview_hide").map((c) => (c[1] as { label: string }).label);
@@ -397,7 +412,7 @@ describe("useNativeWebviews", () => {
       "ws1",
     );
     act(() => {
-      hook.rerender({ s: next, f: null, sus: false });
+      hook.rerender({ s: next, f: null, sus: false, l: "vi" });
     });
     // Allow the rejection to flush through the .catch arrow.
     await Promise.resolve();
@@ -417,7 +432,7 @@ describe("useNativeWebviews", () => {
 
     // Suspend → triggers hide path that rejects.
     act(() => {
-      hook.rerender({ s: initial, f: null, sus: true });
+      hook.rerender({ s: initial, f: null, sus: true, l: "vi" });
     });
     await Promise.resolve();
     await Promise.resolve();
