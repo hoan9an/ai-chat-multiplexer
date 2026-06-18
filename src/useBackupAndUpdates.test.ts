@@ -239,7 +239,39 @@ describe("useBackupAndUpdates", () => {
       expect(result.current.updateStatus).toEqual({ kind: "current" });
     });
 
-    it("reports 'error' when updater check() rejects", async () => {
+    it("reports 'current' when updater check() cannot fetch valid release JSON", async () => {
+      updaterCheck.mockRejectedValue(
+        new Error("Could not fetch a valid release JSON from the remote"),
+      );
+      const { result } = setupHook();
+
+      await act(async () => {
+        await result.current.checkForUpdates();
+      });
+
+      expect(result.current.updateStatus).toEqual({ kind: "current" });
+    });
+
+    it("reports 'current' when latest.json/updater manifest 404s", async () => {
+      const currentMessages = [
+        "HTTP 404 fetching latest.json",
+        "404 Not Found: updater manifest",
+        "404 Not Found: release JSON",
+      ];
+
+      for (const message of currentMessages) {
+        updaterCheck.mockRejectedValueOnce(new Error(message));
+        const { result } = setupHook();
+
+        await act(async () => {
+          await result.current.checkForUpdates();
+        });
+
+        expect(result.current.updateStatus).toEqual({ kind: "current" });
+      }
+    });
+
+    it("reports 'error' when updater check() rejects with a generic error", async () => {
       updaterCheck.mockRejectedValue(new Error("endpoint 404"));
       const { result } = setupHook();
 
@@ -250,6 +282,20 @@ describe("useBackupAndUpdates", () => {
       expect(result.current.updateStatus).toEqual({
         kind: "error",
         message: "endpoint 404",
+      });
+    });
+
+    it("reports 'error' when updater check() rejects with a generic release-word error", async () => {
+      updaterCheck.mockRejectedValue(new Error("release asset corrupted"));
+      const { result } = setupHook();
+
+      await act(async () => {
+        await result.current.checkForUpdates();
+      });
+
+      expect(result.current.updateStatus).toEqual({
+        kind: "error",
+        message: "release asset corrupted",
       });
     });
   });

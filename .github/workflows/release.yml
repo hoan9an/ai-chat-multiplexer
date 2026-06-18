@@ -40,11 +40,29 @@ jobs:
             const repo = context.repo.repo;
 
             // Reuse an existing release for this tag if one is already present,
-            // otherwise create a fresh draft. This keeps re-runs idempotent.
+            // otherwise create a fresh draft. This keeps re-runs idempotent. When
+            // reusing a draft, delete stale draft assets so matrix uploads replace
+            // previous failed/partial artifacts. Never delete assets from a
+            // published release.
             let release;
             try {
               const existing = await github.rest.repos.getReleaseByTag({ owner, repo, tag });
               release = existing.data;
+              if (release.draft) {
+                const assets = await github.paginate(github.rest.repos.listReleaseAssets, {
+                  owner,
+                  repo,
+                  release_id: release.id,
+                  per_page: 100,
+                });
+                for (const asset of assets) {
+                  await github.rest.repos.deleteReleaseAsset({
+                    owner,
+                    repo,
+                    asset_id: asset.id,
+                  });
+                }
+              }
             } catch (error) {
               if (error.status !== 404) {
                 throw error;

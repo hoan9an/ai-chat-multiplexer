@@ -53,6 +53,24 @@ export interface UseBackupAndUpdatesResult {
   restoreFullBackup: () => Promise<void>;
 }
 
+function isMissingUpdaterReleaseJson(message: string): boolean {
+  if (/could not fetch a valid release json from the remote/i.test(message)) {
+    return true;
+  }
+
+  if (!/\b(?:404|not found)\b/i.test(message)) {
+    return false;
+  }
+
+  return (
+    /latest\.json/i.test(message) ||
+    /\bupdater\s+manifest\b/i.test(message) ||
+    /\bupdate\s+manifest\b/i.test(message) ||
+    /\brelease\s+json\b/i.test(message) ||
+    /\brelease\s+manifest\b/i.test(message)
+  );
+}
+
 export function useBackupAndUpdates({
   state,
   setState,
@@ -119,12 +137,10 @@ export function useBackupAndUpdates({
       await checkForUpdatesViaGithubApi();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      // The updater throws "Could not fetch a valid release JSON..." (and similar
-      // release-lookup failures) when no matching release is published yet. To the
-      // user that just means "no new version", so surface the friendly up-to-date
-      // message instead of a red technical error. Genuine failures (network drop,
-      // signature errors) keep the error treatment.
-      if (/release/i.test(message)) {
+      // Treat only known "missing updater manifest/release JSON" lookup failures
+      // as up-to-date. Do not hide offline, permission, signature, or generic asset
+      // corruption errors behind a broad release-word match.
+      if (isMissingUpdaterReleaseJson(message)) {
         setUpdateStatus({ kind: "current" });
         return;
       }
