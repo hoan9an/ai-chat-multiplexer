@@ -78,6 +78,7 @@ function setupHook() {
       setConfirmDialog,
     }),
   );
+  invokeSpy.mockClear();
   return { result, setConfirmDialog };
 }
 
@@ -121,21 +122,20 @@ describe("useBackupAndUpdates — dynamic plugin-fs import rejection", () => {
     expect(result.current.backupBusy).toBe("idle");
   });
 
-  it("exportFullBackup .catch returns null when plugin-fs import rejects (anonymous_16)", async () => {
+  it("exportFullBackup schedules safe startup backup when plugin-fs import rejects", async () => {
     dialogSave.mockResolvedValue("C:/backup.zip");
     invokeSpy.mockResolvedValue(undefined);
-    const alertSpy = vi.spyOn(window, "alert");
-    const { result } = setupHook();
+    const { result, setConfirmDialog } = setupHook();
     await act(async () => {
       await result.current.exportFullBackup();
     });
-    // import().catch arrow returns { writeTextFile: null }; the if(writeTextFile)
-    // branch is skipped, then backup_sessions_zip is invoked and the success alert fires.
     expect(invokeSpy).toHaveBeenCalledWith(
       "backup_sessions_zip",
       expect.objectContaining({ outputPath: "C:/backup.zip" }),
     );
-    expectCallWithMessage(alertSpy, /Backup hoàn tất/);
+    expect(setConfirmDialog).toHaveBeenCalledWith(expect.objectContaining({
+      title: expect.stringContaining("restart"),
+    }));
     expect(result.current.backupBusy).toBe("idle");
   });
 });

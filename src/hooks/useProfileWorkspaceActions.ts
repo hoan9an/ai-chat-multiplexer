@@ -127,7 +127,7 @@ export function useProfileWorkspaceActions({
         title: t("profile.inUseTitle"),
         message: t("profile.inUseMessage"),
         confirmLabel: t("common.ok"),
-        onConfirm: () => undefined,
+        onConfirm: () => setConfirmDialog(null),
       });
       return;
     }
@@ -147,6 +147,7 @@ export function useProfileWorkspaceActions({
           ...current,
           profiles: current.profiles.filter((p) => p.id !== profileId),
         }));
+        setConfirmDialog(null);
       },
     });
   }
@@ -201,6 +202,7 @@ export function useProfileWorkspaceActions({
             activeWorkspaceId: remaining[0].id,
           };
         });
+        setConfirmDialog(null);
       },
     });
   }

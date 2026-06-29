@@ -80,13 +80,15 @@ export function useNativeWebviews({ state, focusedPaneId, suspended, shellsRef, 
             visibleLabels.add(label);
 
             void invoke("native_webview_upsert", {
-              profileId: profileSessionId,
-              label,
-              url: normalizedUrl,
-              x: bounds.left,
-              y: bounds.top,
-              width: bounds.width,
-              height: bounds.height,
+              request: {
+                profileId: profileSessionId,
+                label,
+                url: normalizedUrl,
+                x: bounds.left,
+                y: bounds.top,
+                width: bounds.width,
+                height: bounds.height,
+              },
             }).catch((error) => console.error("native_webview_upsert failed", error));
 
             // If the webview already exists with a different desired URL,

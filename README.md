@@ -90,10 +90,10 @@ How it works:
 ### Backup and restore
 
 - Export/import app configuration as JSON.
-- Full backup can include profile sessions/cookies as a ZIP.
-- Restore session backups from ZIP.
+- Full backup can include app state (workspaces, panes, tabs, profile mapping) and profile session files as a ZIP.
+- Restore app state and profile session files from ZIP; session restore is best-effort.
 
-> **Security note:** full backups may contain login sessions/cookies. Keep them private and do not share them.
+> **Security and portability note:** full backups may contain cookies/session data and should be treated as private secrets. Session restore does not decrypt, export, or manipulate cookies/tokens/DPAPI/app-bound encryption. When restoring on another computer or Windows user, Google/Facebook and other protected sites may require signing in again. On the same machine and Windows user, sessions may remain signed in only when WebView and site protections allow it.
 
 ### Updates
 
@@ -405,7 +405,7 @@ Important security notes:
 
 - External websites run in native webviews.
 - Profiles isolate browser storage via separate data directories.
-- Full backups can include cookies/session data and should be treated as private secrets.
+- Full backups can include cookies/session data and should be treated as private secrets; session restore is best-effort and may not preserve Google/Facebook or other protected-site logins across computers or Windows users. Same-machine/same-Windows-user restores may keep sessions only when WebView and site protections allow it.
 - CSP is disabled in Tauri config to support arbitrary external websites. This is a deliberate browser-shell tradeoff.
 - Do not expose privileged Tauri commands to untrusted external web content.
 

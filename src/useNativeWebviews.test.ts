@@ -134,9 +134,11 @@ describe("useNativeWebviews", () => {
     const upserts = calls("native_webview_upsert");
     expect(upserts).toHaveLength(1);
     expect(upserts[0][1]).toMatchObject({
-      label: "tab-t1",
-      profileId: "prof-default",
-      url: "https://a",
+      request: {
+        label: "tab-t1",
+        profileId: "prof-default",
+        url: "https://a",
+      },
     });
   });
 
@@ -148,8 +150,10 @@ describe("useNativeWebviews", () => {
     );
     setupHookWithShells(state, null, false, ["p1"], "zh");
 
-    const upsert = calls("native_webview_upsert")[0]?.[1] as { url: string } | undefined;
-    expect(upsert?.url).toBe(new URL("/newtab.html?lang=zh", window.location.href).toString());
+    const upsert = calls("native_webview_upsert")[0]?.[1] as
+      | { request: { url: string } }
+      | undefined;
+    expect(upsert?.request.url).toBe(new URL("/newtab.html?lang=zh", window.location.href).toString());
   });
 
   it("hides tabs that are not the pane's activeTab", () => {
@@ -188,7 +192,9 @@ describe("useNativeWebviews", () => {
     );
     setupHookWithShells(state, "p1", false, ["p1", "p2"]);
 
-    const upserts = calls("native_webview_upsert").map((c) => (c[1] as { label: string }).label);
+    const upserts = calls("native_webview_upsert").map(
+      (c) => (c[1] as { request: { label: string } }).request.label,
+    );
     expect(upserts).toEqual(["tab-t1"]);
   });
 
@@ -203,7 +209,7 @@ describe("useNativeWebviews", () => {
     setupHookWithShells(state, null, false, ["p1", "p2"]);
 
     const upsertLabels = calls("native_webview_upsert").map(
-      (c) => (c[1] as { label: string }).label,
+      (c) => (c[1] as { request: { label: string } }).request.label,
     );
     expect(upsertLabels).toEqual(["tab-t1"]);
     const hideLabels = calls("native_webview_hide").map((c) => (c[1] as { label: string }).label);
@@ -307,7 +313,7 @@ describe("useNativeWebviews", () => {
     setupHookWithShells(state, null, false, ["p1"]);
 
     const upserts = calls("native_webview_upsert");
-    expect(upserts[0][1]).toMatchObject({ profileId: "prof-x-y" });
+    expect(upserts[0][1]).toMatchObject({ request: { profileId: "prof-x-y" } });
   });
 
   it("logs an error and continues when native_webview_upsert rejects", async () => {
@@ -453,8 +459,10 @@ describe("useNativeWebviews", () => {
     );
     setupHookWithShells(state, null, false, ["p1"]);
 
-    const upsert = calls("native_webview_upsert")[0]?.[1] as { url: string } | undefined;
-    expect(upsert?.url).toBe("https://from-loaded/");
+    const upsert = calls("native_webview_upsert")[0]?.[1] as
+      | { request: { url: string } }
+      | undefined;
+    expect(upsert?.request.url).toBe("https://from-loaded/");
   });
 
   it("falls back to tab.url when loadedUrl is empty", () => {
@@ -471,8 +479,10 @@ describe("useNativeWebviews", () => {
     );
     setupHookWithShells(state, null, false, ["p1"]);
 
-    const upsert = calls("native_webview_upsert")[0]?.[1] as { url: string } | undefined;
-    expect(upsert?.url).toBe("https://from-url-field/");
+    const upsert = calls("native_webview_upsert")[0]?.[1] as
+      | { request: { url: string } }
+      | undefined;
+    expect(upsert?.request.url).toBe("https://from-url-field/");
   });
 
   it("falls back to tab.currentUrl when loadedUrl and url are both empty", () => {
@@ -489,8 +499,10 @@ describe("useNativeWebviews", () => {
     );
     setupHookWithShells(state, null, false, ["p1"]);
 
-    const upsert = calls("native_webview_upsert")[0]?.[1] as { url: string } | undefined;
-    expect(upsert?.url).toBe("https://from-current/");
+    const upsert = calls("native_webview_upsert")[0]?.[1] as
+      | { request: { url: string } }
+      | undefined;
+    expect(upsert?.request.url).toBe("https://from-current/");
   });
 
   it("does not re-assign liveLabels.current when cleanup runs before sync (line 112)", () => {

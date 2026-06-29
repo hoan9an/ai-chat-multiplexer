@@ -1,15 +1,13 @@
 import { invoke } from "@tauri-apps/api/core";
-import { useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "../i18n";
 import {
   APP_VERSION,
-  DEFAULT_PROFILE_ID,
   GITHUB_REPO,
   RELEASES_URL,
   compareVersions,
-  createDefaultProfiles,
-  hydrateTabs,
   isTauriRuntime,
+  normalizeAppState,
   type AppState,
 } from "../appCore";
 import type { Update } from "@tauri-apps/plugin-updater";
@@ -31,7 +29,7 @@ export interface ConfirmDialogRequest {
   message: string;
   confirmLabel?: string;
   danger?: boolean;
-  onConfirm: () => void;
+  onConfirm: () => void | Promise<void>;
 }
 
 export interface UseBackupAndUpdatesArgs {
@@ -41,9 +39,20 @@ export interface UseBackupAndUpdatesArgs {
   setConfirmDialog: (dialog: ConfirmDialogRequest | null) => void;
 }
 
+interface StartupOperationResult {
+  operation: "backup" | "restore" | string;
+  success: boolean;
+  message: string;
+  zipPath?: string | null;
+  configPath?: string | null;
+  configJson?: string | null;
+  configRestored?: boolean | null;
+  warnings?: string[];
+}
 export interface UseBackupAndUpdatesResult {
   updateStatus: UpdateStatus;
   backupBusy: BackupBusy;
+  startupRestoreProcessing: boolean;
   checkForUpdates: () => Promise<void>;
   downloadAndInstallUpdate: () => Promise<void>;
   openReleasePage: (url: string) => Promise<void>;
@@ -80,10 +89,111 @@ export function useBackupAndUpdates({
   const { t } = useTranslation();
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>({ kind: "idle" });
   const [backupBusy, setBackupBusy] = useState<BackupBusy>("idle");
+  const [startupRestoreProcessing, setStartupRestoreProcessing] = useState(() => isTauriRuntime());
   // Holds the pending Update returned by the Tauri updater `check()` so a later
   // `downloadAndInstallUpdate()` can act on the exact same artifact (signature
   // verification happens inside the plugin during download/install).
   const pendingUpdate = useRef<Update | null>(null);
+
+  function appStateFromJson(configJson: string): AppState | null {
+    try {
+      return normalizeAppState(JSON.parse(configJson) as AppState);
+    } catch {
+      return null;
+    }
+  }
+
+  function applyImportedAppState(parsed: AppState): AppState {
+    const normalized = normalizeAppState(parsed);
+    if (!normalized) {
+      throw new Error(t("backup.invalidConfig"));
+    }
+    return normalized;
+  }
+
+  useLayoutEffect(() => {
+    if (!isTauriRuntime()) {
+      setStartupRestoreProcessing(false);
+      return;
+    }
+    let cancelled = false;
+    void Promise.resolve(invoke<StartupOperationResult[]>("session_startup_results"))
+      .then((results) => {
+        if (cancelled) return;
+        const safeResults = Array.isArray(results) ? results : [];
+        const messages: string[] = [];
+
+        safeResults.forEach((result) => {
+          if (result.operation === "backup") {
+            messages.push(
+              result.success
+                ? t("backup.startupBackupSuccess", {
+                    zip: result.zipPath ?? "",
+                    config: result.configPath ?? "",
+                  })
+                : t("backup.startupBackupError", { msg: result.message }),
+            );
+            return;
+          }
+
+          if (result.operation === "restore") {
+            if (result.success && result.configJson) {
+              const restoredState = appStateFromJson(result.configJson);
+              if (restoredState) {
+                setState(restoredState);
+                setFocusedPaneId(null);
+                messages.push(t("backup.startupRestoreSuccess"));
+              } else {
+                messages.push(t("backup.startupRestoreConfigError", { msg: t("backup.invalidConfig") }));
+              }
+            } else if (result.success) {
+              messages.push(
+                result.configRestored === false
+                  ? t("backup.startupRestorePartial")
+                  : t("backup.startupRestoreSuccess"),
+              );
+            } else {
+              messages.push(t("backup.startupRestoreError", { msg: result.message }));
+            }
+
+            (result.warnings ?? []).forEach((warning) => messages.push(warning));
+            return;
+          }
+
+          messages.push(result.message);
+        });
+
+        if (messages.length > 0) {
+          window.alert(messages.join("\n\n"));
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          console.error("session_startup_results failed", error);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setStartupRestoreProcessing(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [setFocusedPaneId, setState, t]);
+
+  async function restartApp() {
+    try {
+      const { relaunch } = await import("@tauri-apps/plugin-process");
+      await relaunch();
+    } catch {
+      try {
+        await invoke("quit_app");
+      } catch {
+        window.alert(t("backup.restartManual"));
+      }
+    }
+  }
 
   // Web / non-Tauri fallback: query the GitHub REST API and surface the releases
   // page for a manual download. The desktop updater is unavailable here.
@@ -296,10 +406,7 @@ export function useBackupAndUpdates({
         return;
       }
 
-      const parsed = JSON.parse(text) as AppState;
-      if (!Array.isArray(parsed.workspaces) || parsed.workspaces.length === 0) {
-        throw new Error(t("backup.invalidConfig"));
-      }
+      const normalized = applyImportedAppState(JSON.parse(text) as AppState);
 
       setConfirmDialog({
         title: t("backup.replaceConfigTitle"),
@@ -307,24 +414,9 @@ export function useBackupAndUpdates({
         confirmLabel: t("backup.replace"),
         danger: true,
         onConfirm: () => {
-          const profiles =
-            Array.isArray(parsed.profiles) && parsed.profiles.length > 0
-              ? parsed.profiles
-              : createDefaultProfiles();
-          const profileIds = new Set(profiles.map((p) => p.id));
-          const workspaces = parsed.workspaces.map((ws) => ({
-            ...ws,
-            panes: ws.panes.map((pane) => ({
-              ...pane,
-              profileId: profileIds.has(pane.profileId) ? pane.profileId : DEFAULT_PROFILE_ID,
-              tabs: hydrateTabs(pane.tabs ?? []),
-            })),
-          }));
-          const activeId = workspaces.some((ws) => ws.id === parsed.activeWorkspaceId)
-            ? parsed.activeWorkspaceId
-            : workspaces[0].id;
-          setState({ workspaces, activeWorkspaceId: activeId, profiles });
+          setState(normalized);
           setFocusedPaneId(null);
+          setConfirmDialog(null);
         },
       });
     } catch (error) {
@@ -351,18 +443,18 @@ export function useBackupAndUpdates({
         setBackupBusy("idle");
         return;
       }
-      // Save config alongside zip as <name>.json
       const configPath = filePath.replace(/\.zip$/i, ".json");
-      const { writeTextFile } = await import("@tauri-apps/plugin-fs").catch(() => ({
-        writeTextFile: null as null | ((p: string, c: string) => Promise<void>),
-      }));
-      if (writeTextFile) {
-        await writeTextFile(configPath, JSON.stringify(state, null, 2));
-      }
-      await invoke("backup_sessions_zip", { outputPath: filePath });
-      window.alert(
-        t("backup.backupComplete", { zip: filePath, config: configPath }),
-      );
+      await invoke("backup_sessions_zip", {
+        outputPath: filePath,
+        configJson: JSON.stringify(state, null, 2),
+      });
+      setConfirmDialog({
+        title: t("backup.backupScheduledTitle"),
+        message: t("backup.backupScheduledMsg", { zip: filePath, config: configPath }),
+        confirmLabel: t("backup.restartNow"),
+        danger: false,
+        onConfirm: restartApp,
+      });
     } catch (error) {
       window.alert(
         t("backup.backupError", {
@@ -398,11 +490,20 @@ export function useBackupAndUpdates({
         confirmLabel: t("backup.restore"),
         danger: true,
         onConfirm: async () => {
+          setBackupBusy("importing");
           try {
             await invoke("restore_sessions_zip", { inputPath: filePath });
-            window.alert(t("backup.restoreDone"));
+            setConfirmDialog({
+              title: t("backup.restoreSuccessTitle"),
+              message: t("backup.restoreSuccessMsg"),
+              confirmLabel: t("backup.restartNow"),
+              danger: false,
+              onConfirm: restartApp,
+            });
           } catch (error) {
             window.alert(t("backup.restoreError", { msg: error instanceof Error ? error.message : String(error) }));
+          } finally {
+            setBackupBusy("idle");
           }
         },
       });
@@ -416,6 +517,7 @@ export function useBackupAndUpdates({
   return {
     updateStatus,
     backupBusy,
+    startupRestoreProcessing,
     checkForUpdates,
     downloadAndInstallUpdate,
     openReleasePage,

@@ -40,9 +40,10 @@ export const vi = {
 
   // Backup & restore
   "backup.configWord": "Cấu hình",
-  "backup.helpMiddle": " chỉ chứa workspace và profile (không bao gồm cookie). ",
+  "backup.helpMiddle": " lưu workspace, pane, tab và profile. ",
   "backup.fullBackupWord": "Full backup",
-  "backup.helpEnd": " kèm session đăng nhập.",
+  "backup.helpEnd":
+    " lưu session profile (Lưu ý chỉ áp dụng trên thiết bị cũ).",
   "backup.exportConfig": "Xuất cấu hình (.json)",
   "backup.importConfig": "Nhập cấu hình",
   "backup.fullBackup": "Full backup (.zip)",
@@ -59,18 +60,37 @@ export const vi = {
     "Tất cả workspace và profile hiện tại sẽ bị thay bằng nội dung từ file.",
   "backup.replace": "Thay thế",
   "backup.fullDesktopOnly":
-    "Backup full (kèm session/cookie) chỉ chạy được trong app desktop.",
+    "Full backup chỉ chạy trong app desktop.",
   "backup.saveFullTitle": "Lưu full backup",
+  "backup.backupScheduledTitle": "Cần restart để backup đầy đủ",
+  "backup.backupScheduledMsg":
+    "App sẽ restart để backup đầy đủ file session:\n• {zip}\n• {config}\n\nKhi đổi máy hoặc Windows user, một số tài khoản có thể cần đăng nhập lại.",
+  "backup.startupBackupSuccess":
+    "Backup hoàn tất:\n• {zip}\n• {config}\n\nDùng file ZIP để restore; giữ file JSON để tương thích. Không chia sẻ các file này.",
+  "backup.startupBackupError": "Backup lỗi sau khi restart: {msg}",
+  "backup.startupRestoreSuccess":
+    "Restore hoàn tất. Trạng thái app và file session profile đã được áp dụng. Một số tài khoản có thể cần đăng nhập lại khi đổi máy hoặc Windows user.",
+  "backup.startupRestorePartial":
+    "File session profile đã được restore, nhưng mapping workspace/profile chưa được restore. Một số tab có thể dùng layout/profile hiện tại.",
+  "backup.startupRestoreConfigError":
+    "File session profile đã được restore, nhưng không áp dụng được trạng thái app trong backup: {msg}",
+  "backup.startupRestoreError": "Restore lỗi sau khi restart: {msg}",
   "backup.backupComplete":
-    "Backup hoàn tất:\n• {zip}\n• {config}\n\nĐể restore, dùng cả 2 file.",
+    "Backup hoàn tất:\n• {zip}\n• {config}\n\nDùng file ZIP để restore; giữ file JSON để tương thích. Không chia sẻ các file này.",
   "backup.backupError": "Backup lỗi: {msg}",
   "backup.restoreDesktopOnly": "Restore full chỉ chạy được trong app desktop.",
   "backup.chooseRestoreTitle": "Chọn file backup .zip (sessions)",
-  "backup.restoreTitle": "Restore session?",
+  "backup.restoreTitle": "Restore full backup?",
   "backup.restoreMsg":
-    "Cookies hiện tại sẽ bị thay thế. App sẽ cần restart để áp dụng đầy đủ.",
+    "File session profile hiện tại có thể bị thay thế. Khi đổi máy hoặc Windows user, một số tài khoản có thể cần đăng nhập lại. App cần restart để áp dụng đầy đủ.",
   "backup.restore": "Restore",
-  "backup.restoreDone": "Đã restore. Hãy đóng và mở lại app để áp dụng đầy đủ.",
+  "backup.restoreDone":
+    "Đã stage restore. Hãy đóng và mở lại app để áp dụng.",
+  "backup.restoreSuccessTitle": "Restore thành công",
+  "backup.restoreSuccessMsg":
+    "File session profile đã được stage. Restart app ngay để áp dụng full restore?",
+  "backup.restartNow": "Restart ngay",
+  "backup.restartManual": "Không thể tự restart. Hãy đóng và mở lại app thủ công.",
   "backup.restoreError": "Restore lỗi: {msg}",
 
   // Pane

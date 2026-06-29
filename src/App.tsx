@@ -61,6 +61,7 @@ function App() {
   const {
     updateStatus,
     backupBusy,
+    startupRestoreProcessing,
     checkForUpdates,
     downloadAndInstallUpdate,
     openReleasePage,
@@ -97,7 +98,7 @@ function App() {
   useNativeWebviews({
     state,
     focusedPaneId,
-    suspended: shouldSuspendNativeWebviews,
+    suspended: shouldSuspendNativeWebviews || startupRestoreProcessing,
     shellsRef: webviewShells,
     lang,
   });

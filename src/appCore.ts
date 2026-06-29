@@ -322,31 +322,40 @@ function migrateLegacyV4(): AppState | null {
   }
 }
 
+export function normalizeAppState(parsed: AppState): AppState | null {
+  if (!Array.isArray(parsed.workspaces) || parsed.workspaces.length === 0) {
+    return null;
+  }
+
+  const profiles =
+    Array.isArray(parsed.profiles) && parsed.profiles.length > 0
+      ? parsed.profiles
+      : createDefaultProfiles();
+
+  const profileIds = new Set(profiles.map((p) => p.id));
+  const workspaces = parsed.workspaces.map((ws) => ({
+    ...ws,
+    panes: ws.panes.map((pane) => ({
+      ...pane,
+      profileId: profileIds.has(pane.profileId) ? pane.profileId : DEFAULT_PROFILE_ID,
+      tabs: hydrateTabs(pane.tabs ?? []),
+    })),
+  }));
+  const activeId = workspaces.some((ws) => ws.id === parsed.activeWorkspaceId)
+    ? parsed.activeWorkspaceId
+    : workspaces[0].id;
+
+  return { workspaces, activeWorkspaceId: activeId, profiles };
+}
+
 export function loadAppState(): AppState {
   const saved = window.localStorage.getItem(STORAGE_KEY);
 
   if (saved) {
     try {
-      const parsed = JSON.parse(saved) as AppState;
-      if (Array.isArray(parsed.workspaces) && parsed.workspaces.length > 0) {
-        const profiles =
-          Array.isArray(parsed.profiles) && parsed.profiles.length > 0
-            ? parsed.profiles
-            : createDefaultProfiles();
-
-        const profileIds = new Set(profiles.map((p) => p.id));
-        const workspaces = parsed.workspaces.map((ws) => ({
-          ...ws,
-          panes: ws.panes.map((pane) => ({
-            ...pane,
-            profileId: profileIds.has(pane.profileId) ? pane.profileId : DEFAULT_PROFILE_ID,
-            tabs: hydrateTabs(pane.tabs ?? []),
-          })),
-        }));
-        const activeId = workspaces.some((ws) => ws.id === parsed.activeWorkspaceId)
-          ? parsed.activeWorkspaceId
-          : workspaces[0].id;
-        return { workspaces, activeWorkspaceId: activeId, profiles };
+      const normalized = normalizeAppState(JSON.parse(saved) as AppState);
+      if (normalized) {
+        return normalized;
       }
     } catch {
       // fall through to default

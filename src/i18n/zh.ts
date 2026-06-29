@@ -36,9 +36,10 @@ export const zh: Dictionary = {
 
   // Backup & restore
   "backup.configWord": "配置",
-  "backup.helpMiddle": " 仅包含工作区和配置文件（不含 cookie）。",
+  "backup.helpMiddle": "保存工作区、窗格、标签页和配置文件。",
   "backup.fullBackupWord": "完整备份",
-  "backup.helpEnd": " 包含登录会话。",
+  "backup.helpEnd":
+    "保存会话配置文件（注意：仅适用于原设备）。",
   "backup.exportConfig": "导出配置 (.json)",
   "backup.importConfig": "导入配置",
   "backup.fullBackup": "完整备份 (.zip)",
@@ -53,16 +54,37 @@ export const zh: Dictionary = {
   "backup.replaceConfigTitle": "替换当前配置？",
   "backup.replaceConfigMsg": "当前所有工作区和配置文件将被文件内容替换。",
   "backup.replace": "替换",
-  "backup.fullDesktopOnly": "完整备份（含会话/cookie）仅在桌面应用中可用。",
+  "backup.fullDesktopOnly": "完整备份仅在桌面应用中可用。",
   "backup.saveFullTitle": "保存完整备份",
-  "backup.backupComplete": "备份完成：\n• {zip}\n• {config}\n\n恢复时请同时使用两个文件。",
+  "backup.backupScheduledTitle": "需要重启以完成完整备份",
+  "backup.backupScheduledMsg":
+    "应用将重启，并在 WebView2 锁定会话文件前创建完整备份：\n• {zip}\n• {config}\n\n换电脑或 Windows 用户时，部分账号可能需要重新登录。",
+  "backup.startupBackupSuccess":
+    "备份完成：\n• {zip}\n• {config}\n\n使用 ZIP 恢复；保留 JSON 用于兼容。不要分享这些文件。",
+  "backup.startupBackupError": "重启后备份失败：{msg}",
+  "backup.startupRestoreSuccess":
+    "恢复完成。应用状态和配置文件会话文件已应用。换电脑或 Windows 用户时，部分账号可能需要重新登录。",
+  "backup.startupRestorePartial":
+    "配置文件会话文件已恢复，但工作区/配置文件映射未恢复。部分标签页可能会使用当前布局/配置文件。",
+  "backup.startupRestoreConfigError":
+    "配置文件会话文件已恢复，但无法应用备份中的应用状态：{msg}",
+  "backup.startupRestoreError": "重启后恢复失败：{msg}",
+  "backup.backupComplete":
+    "备份完成：\n• {zip}\n• {config}\n\n使用 ZIP 恢复；保留 JSON 用于兼容。不要分享这些文件。",
   "backup.backupError": "备份失败：{msg}",
   "backup.restoreDesktopOnly": "完整恢复仅在桌面应用中可用。",
   "backup.chooseRestoreTitle": "选择备份 .zip 文件（会话）",
-  "backup.restoreTitle": "恢复会话？",
-  "backup.restoreMsg": "当前 cookie 将被替换。应用需要重启才能完全生效。",
+  "backup.restoreTitle": "恢复完整备份？",
+  "backup.restoreMsg":
+    "当前配置文件会话文件可能会被替换。换电脑或 Windows 用户时，部分账号可能需要重新登录。应用需要重启才能完全生效。",
   "backup.restore": "恢复",
-  "backup.restoreDone": "已恢复。请关闭并重新打开应用以完全生效。",
+  "backup.restoreDone":
+    "已暂存恢复。请关闭并重新打开应用以应用恢复。",
+  "backup.restoreSuccessTitle": "恢复成功",
+  "backup.restoreSuccessMsg":
+    "配置文件会话文件已暂存。立即重启应用以应用完整恢复？",
+  "backup.restartNow": "立即重启",
+  "backup.restartManual": "无法自动重启。请手动关闭并重新打开应用。",
   "backup.restoreError": "恢复失败：{msg}",
 
   // Pane
