@@ -3,7 +3,7 @@ export interface ConfirmDialogOptions {
   message: string;
   confirmLabel?: string;
   danger?: boolean;
-  onConfirm: () => void;
+  onConfirm: () => void | Promise<void>;
 }
 
 export interface TextPromptOptions {

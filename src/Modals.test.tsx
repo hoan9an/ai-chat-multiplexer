@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
-import { fireEvent, render, screen, cleanup } from "@testing-library/react";
+import { fireEvent, render, screen, cleanup, waitFor } from "@testing-library/react";
 import { ConfirmDialog, TextPromptModal } from "./components/Modals";
 
 afterEach(cleanup);
@@ -193,7 +193,7 @@ describe("ConfirmDialog", () => {
     expect(btn.className).toContain("danger");
   });
 
-  it("calls onConfirm then onClose when confirm button is clicked", () => {
+  it("calls onConfirm when confirm button is clicked", async () => {
     const onConfirm = vi.fn();
     const onClose = vi.fn();
     render(
@@ -204,7 +204,33 @@ describe("ConfirmDialog", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "OK" }));
     expect(onConfirm).toHaveBeenCalledTimes(1);
-    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("awaits async onConfirm and disables buttons while running", async () => {
+    const onClose = vi.fn();
+    let resolveConfirm!: () => void;
+    const onConfirm = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveConfirm = resolve;
+        }),
+    );
+    render(
+      <ConfirmDialog
+        dialog={{ title: "T", message: "M", onConfirm }}
+        onClose={onClose}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "OK" }));
+
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    expect((screen.getByRole("button", { name: "OK" }) as HTMLButtonElement).disabled).toBe(true);
+
+    resolveConfirm();
+    await waitFor(() =>
+      expect((screen.getByRole("button", { name: "OK" }) as HTMLButtonElement).disabled).toBe(false),
+    );
   });
 
   it("calls onClose when Hủy is clicked without invoking onConfirm", () => {

@@ -90,10 +90,10 @@ Profile 是浏览器 session 容器，而不是针对某个 AI provider 的 pres
 ### Backup / Restore
 
 - 以 JSON 导出/导入应用配置。
-- Full backup 可包含 profile session/cookie ZIP。
-- 从 ZIP 恢复 session。
+- Full backup 可将应用状态（workspace、pane、tab、profile 映射）和 profile 会话文件打包为 ZIP。
+- 从 ZIP 恢复应用状态和 profile 会话文件；session restore 采用 best-effort 方式。
 
-> **安全提示：** full backup 可能包含登录 cookie/session。请将其视为私密数据，不要分享。
+> **安全和可迁移性提示：** full backup 可能包含 cookie/session，应视为私密数据。Session restore 不会解密、导出或操作 cookie、token、DPAPI 或 app-bound encryption。恢复到另一台电脑或另一个 Windows 用户时，Google/Facebook 和其他受保护网站可能需要重新登录。在同一台机器且同一 Windows 用户下，只有 WebView 和网站保护机制允许时，session 才可能保留。
 
 ### Updates
 
@@ -347,7 +347,7 @@ src-tauri/target/release/bundle/msi/*.msi
 
 - 外部网站运行在 native webview 中。
 - Profile 通过独立 data directory 隔离 browser storage。
-- Full backup 可能包含 cookie/session，应视为私密数据。
+- Full backup 可能包含 cookie/session，应视为私密数据；session restore 是 best-effort，跨电脑或跨 Windows 用户时可能无法保留 Google/Facebook 或其他受保护网站的登录状态。同一台机器且同一 Windows 用户下恢复时，也只有 WebView 和网站保护机制允许才可能保留 session。
 - Tauri config 中关闭 CSP 是为了支持任意外部网站，这是 browser-shell app 的有意 tradeoff。
 - 不要向不可信外部 web content 暴露 privileged Tauri commands。
 

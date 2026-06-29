@@ -90,10 +90,10 @@ Luồng hoạt động:
 ### Backup và restore
 
 - Xuất/nhập cấu hình app dạng JSON.
-- Full backup có thể bao gồm session/cookie profile dạng ZIP.
-- Restore session từ ZIP.
+- Full backup có thể bao gồm trạng thái app (workspace, pane, tab, mapping profile) và file session profile dạng ZIP.
+- Restore trạng thái app và file session profile từ ZIP; restore session là best-effort.
 
-> **Lưu ý bảo mật:** full backup có thể chứa cookie/session đăng nhập. Hãy giữ riêng tư và không chia sẻ file này.
+> **Lưu ý bảo mật và tính di động:** full backup có thể chứa cookie/session và phải coi như dữ liệu riêng tư. Restore session không giải mã, export hay thao tác cookie/token/DPAPI/app-bound encryption. Khi restore sang máy khác hoặc Windows user khác, Google/Facebook và các trang được bảo vệ có thể yêu cầu đăng nhập lại. Trên cùng máy và cùng Windows user, session chỉ có thể được giữ khi WebView và site protection cho phép.
 
 ### Cập nhật
 
@@ -347,7 +347,7 @@ src-tauri/target/release/bundle/msi/*.msi
 
 - External websites chạy trong native webview.
 - Profile tách browser storage bằng data directory riêng.
-- Full backup có thể chứa cookie/session và phải coi như dữ liệu riêng tư.
+- Full backup có thể chứa cookie/session và phải coi như dữ liệu riêng tư; restore session là best-effort và có thể không giữ đăng nhập Google/Facebook hoặc trang được bảo vệ khi đổi máy hoặc Windows user. Restore trên cùng máy/cùng Windows user chỉ có thể giữ session khi WebView và site protection cho phép.
 - CSP trong Tauri config được tắt để hỗ trợ nhiều external sites; đây là tradeoff có chủ đích cho browser-shell app.
 - Không expose privileged Tauri commands cho web content không tin cậy.
 

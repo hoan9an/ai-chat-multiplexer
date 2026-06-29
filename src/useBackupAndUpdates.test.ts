@@ -1,6 +1,9 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { expectCallWithMessage, nthCallFirstArgString } from "./test-utils";
+import { vi as viDict } from "./i18n/vi";
+import { en as enDict } from "./i18n/en";
+import { zh as zhDict } from "./i18n/zh";
 
 const invokeSpy = vi.fn();
 const rejectingCommands = new Set<string>();
@@ -109,8 +112,82 @@ function setupHook(initial?: AppState): SetupResult {
       setConfirmDialog,
     }),
   );
+  invokeSpy.mockClear();
   return { state, result, setStateSpy, setFocusedPaneId, setConfirmDialog };
 }
+
+describe("backup/restore product wording", () => {
+  const fullBackupCopyKeys = [
+    "backup.helpEnd",
+    "backup.fullDesktopOnly",
+    "backup.backupScheduledMsg",
+    "backup.startupBackupSuccess",
+    "backup.startupRestoreSuccess",
+    "backup.startupRestorePartial",
+    "backup.startupRestoreConfigError",
+    "backup.backupComplete",
+    "backup.restoreMsg",
+    "backup.restoreDone",
+    "backup.restoreSuccessMsg",
+  ] as const;
+
+  const dictionaries = [
+    {
+      lang: "vi",
+      dict: viDict,
+      expected: {
+        appState: /trạng thái app/i,
+        sessionFiles: /session profile|file session profile/i,
+        originalDevice: /thiết bị cũ/i,
+        replacementRisk: /bị thay thế/i,
+        reauth: /đăng nhập lại/i,
+      },
+    },
+    {
+      lang: "en",
+      dict: enDict,
+      expected: {
+        appState: /app state/i,
+        sessionFiles: /session profiles|profile session files/i,
+        originalDevice: /original device/i,
+        replacementRisk: /may be replaced/i,
+        reauth: /sign-in again/i,
+      },
+    },
+    {
+      lang: "zh",
+      dict: zhDict,
+      expected: {
+        appState: /应用状态/,
+        sessionFiles: /会话配置文件|配置文件会话文件/,
+        originalDevice: /原设备/,
+        replacementRisk: /可能会被替换/,
+        reauth: /重新登录/,
+      },
+    },
+  ];
+
+  it.each(dictionaries)("makes full backup session restore limits explicit in $lang", ({ dict, expected }) => {
+    const fullBackupHelp = fullBackupCopyKeys.map((key) => dict[key]).join("\n");
+
+    expect(fullBackupHelp).toMatch(expected.appState);
+    expect(fullBackupHelp).toMatch(expected.sessionFiles);
+    expect(fullBackupHelp).toMatch(expected.originalDevice);
+    expect(fullBackupHelp).toMatch(expected.replacementRisk);
+    expect(fullBackupHelp).toMatch(expected.reauth);
+  });
+
+  it("does not describe full backup as guaranteed login preservation", () => {
+    const allBackupCopy = dictionaries
+      .flatMap(({ dict }) => fullBackupCopyKeys.map((key) => dict[key]))
+      .join("\n");
+
+    expect(allBackupCopy).not.toMatch(/includes login sessions/i);
+    expect(allBackupCopy).not.toMatch(/including sessions\/cookies/i);
+    expect(allBackupCopy).not.toMatch(/kèm session đăng nhập/i);
+    expect(allBackupCopy).not.toMatch(/含会话\/cookie|包含登录会话/);
+  });
+});
 
 describe("useBackupAndUpdates", () => {
   beforeEach(() => {
@@ -127,6 +204,76 @@ describe("useBackupAndUpdates", () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
+
+  describe("startup restore results", () => {
+    it("applies restored app state before releasing startup restore processing", async () => {
+      tauriRuntime = true;
+      const restoredState: AppState = {
+        workspaces: [
+          {
+            id: "ws-restored",
+            name: "Restored",
+            columns: 1,
+            panes: [
+              {
+                id: "pane-restored",
+                title: "Restored pane",
+                profileId: "prof-personal",
+                activeTabId: "tab-restored",
+                tabs: [{ id: "tab-restored", title: "Facebook", url: "https://facebook.com", loadedUrl: "https://facebook.com" }],
+              },
+            ],
+          },
+        ],
+        activeWorkspaceId: "ws-restored",
+        profiles: [
+          { id: "prof-default", name: "Default" },
+          { id: "prof-personal", name: "Personal" },
+        ],
+      };
+      invokeSpy.mockResolvedValueOnce([
+        {
+          operation: "restore",
+          success: true,
+          message: "ok",
+          configJson: JSON.stringify(restoredState),
+          configRestored: true,
+          warnings: [],
+        },
+      ]);
+      const alertSpy = vi.spyOn(window, "alert");
+
+      const { result, setStateSpy, setFocusedPaneId } = setupHook();
+
+      expect(result.current.startupRestoreProcessing).toBe(true);
+      await waitFor(() => expect(setStateSpy).toHaveBeenCalledWith(expect.objectContaining({ activeWorkspaceId: "ws-restored" })));
+      await waitFor(() => expect(result.current.startupRestoreProcessing).toBe(false));
+      expect(setFocusedPaneId).toHaveBeenCalledWith(null);
+      expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining("Restore hoàn tất"));
+    });
+
+    it("does not replace state when restored config is invalid", async () => {
+      tauriRuntime = true;
+      invokeSpy.mockResolvedValueOnce([
+        {
+          operation: "restore",
+          success: true,
+          message: "ok",
+          configJson: "{}",
+          configRestored: true,
+          warnings: ["warning text"],
+        },
+      ]);
+      const alertSpy = vi.spyOn(window, "alert");
+
+      const { result, setStateSpy } = setupHook();
+
+      await waitFor(() => expect(result.current.startupRestoreProcessing).toBe(false));
+      expect(setStateSpy).not.toHaveBeenCalled();
+      expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining("warning text"));
+    });
+  });
+
 
   describe("checkForUpdates", () => {
     it("returns 'available' when GitHub release tag is newer than APP_VERSION", async () => {
@@ -451,7 +598,7 @@ describe("useBackupAndUpdates", () => {
       await act(async () => {
         await result.current.exportConfigJson();
       });
-      expect(invokeSpy).not.toHaveBeenCalled();
+      expect(invokeSpy).not.toHaveBeenCalledWith("plugin:fs|write_text_file", expect.anything());
       expect(writeTextFileSpy).not.toHaveBeenCalled();
       expect(result.current.backupBusy).toBe("idle");
     });
@@ -762,27 +909,25 @@ describe("useBackupAndUpdates", () => {
       await act(async () => {
         await result.current.exportFullBackup();
       });
-      expect(invokeSpy).not.toHaveBeenCalled();
+      expect(invokeSpy).not.toHaveBeenCalledWith("backup_sessions_zip", expect.anything());
       expect(result.current.backupBusy).toBe("idle");
     });
 
-    it("writes config json and invokes backup_sessions_zip on success", async () => {
+    it("invokes backup_sessions_zip with config json on success", async () => {
       dialogSave.mockResolvedValue("C:/tmp/backup.zip");
-      writeTextFileSpy.mockResolvedValue(undefined);
       invokeSpy.mockResolvedValue(undefined);
-      const alertSpy = vi.spyOn(window, "alert");
-      const { result } = setupHook();
+      const { result, setConfirmDialog } = setupHook();
       await act(async () => {
         await result.current.exportFullBackup();
       });
-      expect(writeTextFileSpy).toHaveBeenCalledWith(
-        "C:/tmp/backup.json",
-        expect.stringContaining("workspaces"),
-      );
+      expect(writeTextFileSpy).not.toHaveBeenCalled();
       expect(invokeSpy).toHaveBeenCalledWith("backup_sessions_zip", {
         outputPath: "C:/tmp/backup.zip",
+        configJson: expect.stringContaining("workspaces"),
       });
-      expectCallWithMessage(alertSpy, /Backup/i);
+      expect(setConfirmDialog).toHaveBeenCalledWith(expect.objectContaining({
+        title: expect.stringContaining("restart"),
+      }));
       expect(result.current.backupBusy).toBe("idle");
     });
 
@@ -799,22 +944,22 @@ describe("useBackupAndUpdates", () => {
       expect(result.current.backupBusy).toBe("idle");
     });
 
-    it("skips writeTextFile when plugin-fs export is null (line 251 falsy)", async () => {
+    it("does not depend on plugin-fs for full backup sidecar config", async () => {
       writeTextFileExportNull = true;
       dialogSave.mockResolvedValue("C:/tmp/backup.zip");
       invokeSpy.mockResolvedValue(undefined);
-      const alertSpy = vi.spyOn(window, "alert");
-      const { result } = setupHook();
+      const { result, setConfirmDialog } = setupHook();
       await act(async () => {
         await result.current.exportFullBackup();
       });
-      // writeTextFileSpy should NOT have been called when export is null
       expect(writeTextFileSpy).not.toHaveBeenCalled();
-      // Backup still proceeds
       expect(invokeSpy).toHaveBeenCalledWith("backup_sessions_zip", {
         outputPath: "C:/tmp/backup.zip",
+        configJson: expect.stringContaining("workspaces"),
       });
-      expectCallWithMessage(alertSpy, /Backup/i);
+      expect(setConfirmDialog).toHaveBeenCalledWith(expect.objectContaining({
+        title: expect.stringContaining("restart"),
+      }));
       expect(result.current.backupBusy).toBe("idle");
     });
 
@@ -824,7 +969,7 @@ describe("useBackupAndUpdates", () => {
       await act(async () => {
         await result.current.exportFullBackup();
       });
-      expect(invokeSpy).not.toHaveBeenCalled();
+      expect(invokeSpy).not.toHaveBeenCalledWith("backup_sessions_zip", expect.anything());
       expect(writeTextFileSpy).not.toHaveBeenCalled();
       expect(result.current.backupBusy).toBe("idle");
     });
@@ -860,7 +1005,6 @@ describe("useBackupAndUpdates", () => {
     it("opens confirm dialog and invokes restore_sessions_zip on confirm", async () => {
       dialogOpen.mockResolvedValue("C:/tmp/in.zip");
       invokeSpy.mockResolvedValue(undefined);
-      const alertSpy = vi.spyOn(window, "alert");
       const { result, setConfirmDialog } = setupHook();
       await act(async () => {
         await result.current.restoreFullBackup();
@@ -873,7 +1017,43 @@ describe("useBackupAndUpdates", () => {
       expect(invokeSpy).toHaveBeenCalledWith("restore_sessions_zip", {
         inputPath: "C:/tmp/in.zip",
       });
-      expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining("restore"));
+      expect(setConfirmDialog).toHaveBeenCalledTimes(2);
+      const successDialog = setConfirmDialog.mock.calls[1][0];
+      expect(successDialog.title).toContain("Restore");
+      expect(result.current.backupBusy).toBe("idle");
+    });
+
+    it("keeps backupBusy importing while confirmed restore is running", async () => {
+      dialogOpen.mockResolvedValue("C:/tmp/in.zip");
+      invokeSpy.mockResolvedValueOnce([]);
+      let resolveRestore!: () => void;
+      const { result, setConfirmDialog } = setupHook();
+      invokeSpy.mockImplementation((cmd: string) => {
+        if (cmd === "restore_sessions_zip") {
+          return new Promise<void>((resolve) => {
+            resolveRestore = resolve;
+          });
+        }
+        return Promise.resolve([]);
+      });
+
+      await act(async () => {
+        await result.current.restoreFullBackup();
+      });
+      expect(result.current.backupBusy).toBe("idle");
+
+      const dialogArg = setConfirmDialog.mock.calls[0][0];
+      let confirmPromise!: Promise<void>;
+      await act(async () => {
+        confirmPromise = dialogArg.onConfirm();
+      });
+      expect(result.current.backupBusy).toBe("importing");
+
+      await act(async () => {
+        resolveRestore();
+        await confirmPromise;
+      });
+      expect(result.current.backupBusy).toBe("idle");
     });
 
     it("dialog onConfirm alerts on invoke error", async () => {

@@ -87,8 +87,6 @@ export function AppOverlays(props: AppOverlaysProps) {
         onSubmit={submitTextPrompt}
       />
 
-      <ConfirmDialog dialog={confirmDialog} onClose={() => setConfirmDialog(null)} />
-
       <SettingsModal
         open={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
@@ -104,6 +102,8 @@ export function AppOverlays(props: AppOverlaysProps) {
         onExportFullBackup={exportFullBackup}
         onRestoreFullBackup={restoreFullBackup}
       />
+
+      <ConfirmDialog dialog={confirmDialog} onClose={() => setConfirmDialog(null)} />
 
       <DownloadToastStack
         toasts={downloadToasts}

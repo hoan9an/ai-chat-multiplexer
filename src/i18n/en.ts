@@ -36,9 +36,10 @@ export const en: Dictionary = {
 
   // Backup & restore
   "backup.configWord": "Config",
-  "backup.helpMiddle": " contains only workspaces and profiles (no cookies). ",
+  "backup.helpMiddle": " saves workspaces, panes, tabs, and profiles. ",
   "backup.fullBackupWord": "Full backup",
-  "backup.helpEnd": " includes login sessions.",
+  "backup.helpEnd":
+    " saves session profiles (Note: only applies on the original device).",
   "backup.exportConfig": "Export config (.json)",
   "backup.importConfig": "Import config",
   "backup.fullBackup": "Full backup (.zip)",
@@ -55,18 +56,37 @@ export const en: Dictionary = {
     "All current workspaces and profiles will be replaced with the contents of the file.",
   "backup.replace": "Replace",
   "backup.fullDesktopOnly":
-    "Full backup (including sessions/cookies) is only available in the desktop app.",
+    "Full backup is only available in the desktop app.",
   "backup.saveFullTitle": "Save full backup",
+  "backup.backupScheduledTitle": "Restart required for a complete backup",
+  "backup.backupScheduledMsg":
+    "The app will restart to create a full backup before WebView2 locks session files:\n• {zip}\n• {config}\n\nOn another computer or Windows user, some accounts may need sign-in again.",
+  "backup.startupBackupSuccess":
+    "Backup complete:\n• {zip}\n• {config}\n\nUse the ZIP to restore; keep the JSON for compatibility. Do not share these files.",
+  "backup.startupBackupError": "Backup failed after restart: {msg}",
+  "backup.startupRestoreSuccess":
+    "Restore complete. App state and profile session files were applied. Some accounts may need sign-in again on another computer or Windows user.",
+  "backup.startupRestorePartial":
+    "Profile session files were restored, but the workspace/profile mapping was not restored. Some tabs may use the current layout/profile.",
+  "backup.startupRestoreConfigError":
+    "Profile session files were restored, but the backup app state could not be applied: {msg}",
+  "backup.startupRestoreError": "Restore failed after restart: {msg}",
   "backup.backupComplete":
-    "Backup complete:\n• {zip}\n• {config}\n\nTo restore, use both files.",
+    "Backup complete:\n• {zip}\n• {config}\n\nUse the ZIP to restore; keep the JSON for compatibility. Do not share these files.",
   "backup.backupError": "Backup failed: {msg}",
   "backup.restoreDesktopOnly": "Full restore is only available in the desktop app.",
   "backup.chooseRestoreTitle": "Choose backup .zip file (sessions)",
-  "backup.restoreTitle": "Restore session?",
+  "backup.restoreTitle": "Restore full backup?",
   "backup.restoreMsg":
-    "Current cookies will be replaced. The app needs to restart to fully apply.",
+    "Current profile session files may be replaced. On another computer or Windows user, some accounts may need sign-in again. The app needs to restart to fully apply.",
   "backup.restore": "Restore",
-  "backup.restoreDone": "Restored. Close and reopen the app to fully apply.",
+  "backup.restoreDone":
+    "Restore staged. Close and reopen the app to apply it.",
+  "backup.restoreSuccessTitle": "Restore successful",
+  "backup.restoreSuccessMsg":
+    "Profile session files are staged. Restart the app now to apply the full restore?",
+  "backup.restartNow": "Restart now",
+  "backup.restartManual": "Could not restart automatically. Please close and reopen the app manually.",
   "backup.restoreError": "Restore failed: {msg}",
 
   // Pane

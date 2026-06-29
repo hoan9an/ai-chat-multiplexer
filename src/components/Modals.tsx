@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useTranslation } from "../i18n";
 
 type TextPromptState = {
@@ -72,7 +73,7 @@ export type ConfirmDialogState = {
   message: string;
   confirmLabel?: string;
   danger?: boolean;
-  onConfirm: () => void;
+  onConfirm: () => void | Promise<void>;
 };
 
 export type ConfirmDialogProps = {
@@ -82,8 +83,22 @@ export type ConfirmDialogProps = {
 
 export function ConfirmDialog({ dialog, onClose }: ConfirmDialogProps) {
   const { t } = useTranslation();
+  const [isConfirming, setIsConfirming] = useState(false);
 
   if (!dialog) return null;
+
+  const handleConfirm = async () => {
+    if (isConfirming) return;
+
+    setIsConfirming(true);
+    try {
+      await dialog.onConfirm();
+    } catch (error) {
+      console.error("confirm dialog action failed", error);
+    } finally {
+      setIsConfirming(false);
+    }
+  };
 
   return (
     <div
@@ -96,16 +111,14 @@ export function ConfirmDialog({ dialog, onClose }: ConfirmDialogProps) {
         <h3 className="modal-title">{dialog.title}</h3>
         <p className="modal-message">{dialog.message}</p>
         <div className="modal-actions">
-          <button type="button" className="modal-btn" onClick={onClose}>
+          <button type="button" className="modal-btn" onClick={onClose} disabled={isConfirming}>
             {t("common.cancel")}
           </button>
           <button
             type="button"
             className={dialog.danger ? "modal-btn danger" : "modal-btn primary"}
-            onClick={() => {
-              dialog.onConfirm();
-              onClose();
-            }}
+            onClick={() => void handleConfirm()}
+            disabled={isConfirming}
           >
             {dialog.confirmLabel ?? t("common.ok")}
           </button>

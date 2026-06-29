@@ -27,6 +27,10 @@ dist-ssr
 # Tauri / Rust build artifacts
 src-tauri/target/
 
+# Local agent-memory stores
+data/state_store.db/
+data/stream_store/
+
 # Environment / secrets
 .env
 .env.local
