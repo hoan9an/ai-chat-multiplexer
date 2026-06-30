@@ -1,280 +1,128 @@
 # AI Chat Multiplexer
 
-一个桌面工作区应用，用于并排运行多个 AI 聊天会话，并提供类似 Chrome Profile 的隔离配置，以便同时使用多个账号。
+一个 local-first 桌面指挥中心，用来并排比较、调度并保留多个 AI 聊天会话。
 
-![Status](https://img.shields.io/badge/status-active-success) ![Tauri](https://img.shields.io/badge/Tauri-2-orange) ![React](https://img.shields.io/badge/React-19-blue) ![License](https://img.shields.io/badge/license-MIT-green)
+![Status](https://img.shields.io/badge/status-active-success) ![Version](https://img.shields.io/badge/version-0.1.10-blue) ![Tauri](https://img.shields.io/badge/Tauri-2-orange) ![React](https://img.shields.io/badge/React-19-blue) ![License](https://img.shields.io/badge/license-MIT-green)
 
 语言：[English](./README.md) · [Tiếng Việt](./README.vi.md) · [中文](./README.zh.md)
 
 ---
 
-## 概览
+## 一个 workspace，容纳所有 AI 对话。
 
-AI Chat Multiplexer 是一个 local-first 桌面应用，适合经常同时使用多个 AI 工具的人。你不需要在浏览器里打开一堆混乱的标签页，而是可以把一个桌面窗口分成多个 pane，并排运行 Claude、ChatGPT、Gemini、Perplexity、DeepSeek、本地工具或任意 URL。
+AI Chat Multiplexer 把桌面变成一个专注的 AI 工作控制台：一个 pane 里打开 Claude，另一个 pane 里打开 ChatGPT，Gemini 放在研究工具旁边，同时 Work/Personal 账号保持安全隔离。
 
-应用使用真正的 Tauri native webview，而不是 iframe。因此，即使现代 AI 网站禁止 iframe 嵌入，也可以在桌面应用中正常运行。
+不再到处找浏览器标签页。不再反复登录退出。不再因为某个模型还在思考而丢掉上下文。
 
----
+![AI Chat Multiplexer 桌面 workspace 预览](./docs/assets/ai-multiplexer-hero.png)
 
-## 为什么需要它？
-
-使用 AI 工作时，经常会遇到这些场景：
-
-- 向多个模型询问同一个问题；
-- 一个 AI 在写作，另一个 AI 在调研；
-- 对比 Work 和 Personal 账号；
-- 等待长回复时切换到其他任务；
-- 为不同项目保留多个上下文。
-
-普通浏览器标签页很快会变得混乱。AI Chat Multiplexer 把类似 terminal multiplexer 的工作方式带到 AI workflow：多个 pane、多个 tab、独立 profile、一个专注的 workspace。
+<p align="center">
+  <a href="https://github.com/hoan9an/ai-chat-multiplexer/releases/latest"><strong>下载最新版本</strong></a>
+  ·
+  <a href="https://github.com/hoan9an/ai-chat-multiplexer/releases/tag/v0.1.10">查看 v0.1.10</a>
+  ·
+  <a href="#quick-start">从源码运行</a>
+</p>
 
 ---
 
-## 核心功能
+## 为 AI 重度使用者的真实工作流而设计
 
-### Workspaces
+现代 AI 工作很少只靠一个聊天窗口完成。你会比较答案、并行运行 prompt、保留项目上下文，并在多个账号之间切换。普通浏览器标签页可以做到一部分，但很快会变得混乱且脆弱。
 
-- 创建多个 workspace，例如 `Work`、`Personal`、`Research` 或按项目划分。
-- 每个 workspace 拥有自己的 pane 布局。
-- 在应用内重命名或删除 workspace。
-- 重新打开应用时恢复状态。
+AI Chat Multiplexer 把 terminal multiplexer 式的工作方式带到 AI workflow：
 
-### 灵活布局
+- 向多个模型提出同一个问题，并实时对比回答；
+- 把研究、写作、编码和 review 聊天放在同一个视野里；
+- 用独立 profile 隔离客户、工作、个人和实验账号；
+- 重启应用后继续保留重要会话；
+- 通过 native Tauri webview 使用那些禁止 iframe 嵌入的 AI 网站。
 
-- 单 pane Focus mode。
-- 2 列、3 列、4 列布局。
-- 列数会根据 pane 数量自动限制。
-- 拖拽 pane 重新排序。
-- 放大某个 pane，同时保留当前 workspace。
+---
 
-### 类 Chrome Profile
+## 亮点功能
 
-Profile 是浏览器 session 容器，而不是针对某个 AI provider 的 preset。
+### 多 pane AI workspace
 
-- 每个 profile 都有独立的 cookie/storage/session 目录。
-- 可以使用 `Work`、`Personal` 或任意自定义名称。
-- 多个 pane 使用同一个 profile 时会共享登录/session。
-- 不同 profile 之间账号完全隔离。
-- 关闭 pane 不会删除 profile/session。
-- 正在被 pane 使用的 profile 不能删除。
+把一个桌面窗口拆成多个专注 pane。支持 focus mode、2 列、3 列、4 列布局，并可拖拽 pane，让界面贴合你的工作节奏。
 
-### Pane 内部 Tabs
+### 类 Chrome 的 profile 隔离
 
-- 每个 pane 支持多个 tab。
-- 每个 tab 拥有自己的 URL、title、favicon 和 loading 状态。
-- 地址栏支持直接 URL、localhost 和搜索查询。
-- 当前 tab 支持 back、forward、reload。
-- 支持拖拽重新排序 tab。
-- 当两个 pane 使用相同 profile 时，可以跨 pane 移动 tab。
-- 可以把 tab detach 成新的 pane。
+Profile 是真正的浏览器 session 容器。每个 profile 都有自己的 cookie、storage、cache 和登录 session，因此 Work 和 Personal 账号可以同时登录且互不串扰。
 
-### Native webview engine
+### 每个 pane 内都有 tabs
 
-许多 AI 网站通过 `X-Frame-Options` 或 CSP 禁止 iframe。AI Chat Multiplexer 使用 Tauri native child webview 来绕开这个限制。
+每个 pane 可以包含多个 tab，每个 tab 都有独立的 URL、title、favicon 和 loading 状态。你可以重新排序 tab，在相同 profile 的 pane 之间移动 tab，或把 tab detach 成新的 pane。
 
-工作方式：
+### Native webview，而不是脆弱 iframe
 
-1. React 为 active pane 渲染一个空的 `webview-shell`。
-2. React 测量该 shell 的位置和大小。
-3. Tauri 创建或移动 native webview，使其与 shell 对齐。
-4. Webview 使用所选 profile 的 session directory。
-5. 当 menu、modal、download panel 或 drag overlay 打开时，native webview 会被隐藏，避免覆盖 React UI。
+许多 AI 服务会通过 CSP 或 `X-Frame-Options` 阻止 iframe。AI Chat Multiplexer 使用 Tauri native child webview，让这些网站像正常桌面浏览器界面一样运行。
 
-### Downloads
+### Local-first 状态
 
-- native webview 内发起的下载由 Rust/Tauri 处理。
-- 应用显示 download toast。
-- 下载完成后可以打开文件或打开所在文件夹。
-- 包含针对 Windows WebView2 download finished 事件不稳定的 workaround。
+Workspaces、panes、tabs、profiles、theme 和 layout 都存储在本地。这个应用是你所选择服务的桌面 shell，而不是托管你的聊天内容的代理服务。
 
 ### Backup / Restore
 
-- 以 JSON 导出/导入应用配置。
-- Full backup 可将应用状态（workspace、pane、tab、profile 映射）和 profile 会话文件打包为 ZIP。
-- 从 ZIP 恢复应用状态和 profile 会话文件；session restore 采用 best-effort 方式。
+支持以 JSON 导出/导入配置，也可以创建 full ZIP backup，包含 workspace、pane、tab、profile 映射和 profile session 文件。Full backup 可能包含 cookie/session，应当作为私密数据保护。Session restore 是 best-effort；跨机器或跨 Windows 用户时，受保护网站仍可能要求重新登录。
 
-> **安全和可迁移性提示：** full backup 可能包含 cookie/session，应视为私密数据。Session restore 不会解密、导出或操作 cookie、token、DPAPI 或 app-bound encryption。恢复到另一台电脑或另一个 Windows 用户时，Google/Facebook 和其他受保护网站可能需要重新登录。在同一台机器且同一 Windows 用户下，只有 WebView 和网站保护机制允许时，session 才可能保留。
+### 支持 auto-update
 
-### Updates
-
-- 应用可检查最新 GitHub release。
-- 在 desktop app 中，已签名的新版本可通过 Tauri updater 下载、安装并 relaunch；non-Tauri/web fallback 会打开 release 页面。
+Desktop app 可以检查 GitHub releases。已签名版本可以通过 Tauri updater 下载、安装并 relaunch；fallback 环境会打开 release 页面。
 
 ---
 
-## 技术栈
+## 常见工作流
 
-| Layer | Technology |
+| Workflow | AI Chat Multiplexer 如何帮助你 |
 |---|---|
-| Frontend | React 19 + TypeScript + Vite 7 |
-| Desktop runtime | Tauri 2 |
-| Native backend | Rust |
-| State storage | `localStorage` |
-| Browser session storage | Tauri webview `data_directory` per profile |
-| Styling | Plain CSS |
-| Tests | Vitest + Testing Library + jsdom |
-| Icons | Inline custom SVG components |
+| 模型对比 | 并排打开 Claude、ChatGPT、Gemini 和 Perplexity，询问同一个问题。 |
+| 研究 + 写作 | 让研究 pane 保持可见，同时让另一个 AI 写作、修改或总结。 |
+| 账号隔离 | 使用 Work、Personal、Client 或 Lab profiles，保持独立登录 session。 |
+| 长时间 prompt | 一个模型思考时，你可以继续在另一个 pane 工作。 |
+| 项目上下文 | 为客户、repo、主题或实验创建独立 workspace。 |
+| 本地工具 | 把 localhost app、docs、dashboard 或本地 AI 工具放在 hosted AI chat 旁边。 |
 
 ---
 
-## 项目结构
+## 隐私与安全模型
 
-```text
-.
-├── src/
-│   ├── App.tsx                         # Composition root
-│   ├── appCore.ts                      # Types, constants, helpers, migrations
-│   ├── newtab.ts                       # New-tab URL helpers
-│   ├── main.tsx                        # React entrypoint
-│   ├── App.css                         # Theme and layout styles
-│   ├── Icons.tsx                       # Inline SVG icons
-│   ├── components/                     # UI components
-│   ├── hooks/                          # State/effects/actions hooks
-│   └── types/
-├── src-tauri/
-│   ├── src/lib.rs                      # Tauri commands and native backend
-│   ├── Cargo.toml
-│   ├── Cargo.lock
-│   └── tauri.conf.json
-├── public/
-├── scripts/
-├── package.json
-└── README.md
-```
+AI Chat Multiplexer 采用 local-first 设计：
+
+- 外部 AI 网站运行在 native desktop webview 中；
+- browser storage 通过独立 data directory 按 profile 隔离；
+- workspace 状态存储在本地；
+- full backup 可能包含敏感 session 文件，应按私密数据处理；
+- session restore 不会解密、导出或绕过 cookie、token、DPAPI、app-bound encryption 或网站保护机制。
+
+由于这是 browser-shell 类型的桌面应用，请只使用可信服务，并避免把 privileged Tauri commands 暴露给不可信 web content。
 
 ---
 
-## 架构
+## Quick start
 
-### Data model
+### 下载应用
 
-```text
-AppState
-├── workspaces[]
-│   └── panes[]
-│       └── tabs[]
-└── profiles[]
-```
+从 GitHub Releases 获取最新安装包：
 
-含义：
+- Latest release: <https://github.com/hoan9an/ai-chat-multiplexer/releases/latest>
+- Current app version: `0.1.10`
 
-- Workspace：独立工作空间和布局。
-- Pane：一个 browser/chat 区域。
-- Tab：同一个 pane 内的多个页面/聊天。
-- Profile：独立 cookie/session 容器。
+Windows 用户可从 release 页面安装 `.exe`/`.msi` artifact。Microsoft Edge WebView2 Runtime 是必需项，Windows 10/11 通常已经预装。
 
-### URL 字段语义
+### 从源码运行
 
-应用区分“主动加载的 URL”和“从 webview 观察到的 URL”：
+要求：
 
-- `loadedUrl`：应用最后一次明确要求 native webview 加载的 URL。
-- `currentUrl`：native webview 在 redirect 或 SPA route change 后报告的 URL。
-- 地址栏显示 observed URL，但 SPA route change 不能反向触发 `load_url`，否则 Gemini 等 SPA 可能 reload 并丢失页面内状态。
-
-### Native webview lifecycle
-
-```text
-React Pane
-  └── webview-shell DOM rectangle
-        ↓
-useNativeWebviews
-  └── native_webview_upsert(profileId, label, url, x, y, width, height)
-        ↓
-Rust/Tauri
-  └── WebviewBuilder::new(label, url)
-      .data_directory(profile_session_directory)
-      .enable_clipboard_access()
-```
-
-Native webview label 基于 tab ID，因此移动 tab 时不会销毁 webview/session。
-
-### Profile session isolation
-
-每个 profile 映射到独立 session 目录：
-
-```text
-app_data_dir/pane-sessions/<profile_id>/
-```
-
-cookie、localStorage、IndexedDB、cache 和登录 session 都按 profile 隔离。
-
----
-
-## 关键不变量
-
-修改应用时必须保持这些规则：
-
-1. Native webview label 必须对同一个 tab 保持稳定。
-2. Profile ID 必须映射到独立的 `data_directory`。
-3. Pane 不应永久为空。
-4. Workspace 必须有有效的 active fallback。
-5. 只有相同 profile 的 pane 之间才允许跨 pane 移动 tab。
-6. menu/modal/download panel/drag overlay 打开时必须隐藏 native webview。
-7. 被动 native status polling 不能触发 reload。
-8. State migration 必须保留用户数据。
-
----
-
-## 系统要求
-
-### 通用
-
-- Node.js 20+ 推荐
+- Node.js 20+
 - npm
 - Rust stable
 - Tauri 支持的桌面环境
-
-### Windows
-
-- Windows 10/11
-- Microsoft Edge WebView2 Runtime
-- Visual Studio 2022 Build Tools with C++ workload
-- Rust MSVC toolchain
-
-### Linux/WSL
-
-```bash
-sudo apt-get update
-sudo apt-get install -y \
-  libdbus-1-dev \
-  libwebkit2gtk-4.1-dev \
-  libgtk-3-dev \
-  libayatana-appindicator3-dev \
-  librsvg2-dev \
-  patchelf \
-  build-essential \
-  curl \
-  wget \
-  file \
-  libssl-dev
-```
-
----
-
-## 安装与运行
-
-安装依赖：
+- Windows：Visual Studio 2022 Build Tools with C++ workload 和 Rust MSVC toolchain
 
 ```bash
 npm install
-```
-
-运行 web-only dev mode：
-
-```bash
-npm run dev
-```
-
-运行 desktop dev mode：
-
-```bash
 npm run tauri dev
-```
-
-构建 frontend：
-
-```bash
-npm run build
 ```
 
 构建 desktop app：
@@ -283,101 +131,44 @@ npm run build
 npm run tauri build
 ```
 
----
-
-## Testing
-
-运行完整测试：
+也可以运行 web-only development，但许多 AI 网站会主动阻止 iframe。真实测试请使用 desktop mode。
 
 ```bash
-npm test
-```
-
-Watch mode：
-
-```bash
-npm run test:watch
-```
-
-Vitest UI：
-
-```bash
-npm run test:ui
-```
-
-测试覆盖 state helpers、migrations、pane/tab behavior、native webview sync、backup/update、download manager 和 components。
-
----
-
-## Manual desktop smoke test
-
-1. 打开 desktop app。
-2. 用同一个 profile 打开两个 pane，确认 session 共享。
-3. 用不同 profile 打开两个 pane，确认登录状态隔离。
-4. 打开 Gemini，创建新聊天，输入一条消息，确认不会 flicker/reload 导致 conversation 丢失。
-5. webview 可见时打开 Settings，确认 modal 不被遮挡。
-6. 拖拽 pane，确认 webview 正确隐藏/重新显示。
-7. 在 pane 内拖拽 tab。
-8. 在相同 profile 的 pane 之间拖拽 tab。
-9. 确认不同 profile 之间不能移动 tab。
-10. 下载文件并检查 toast/open/reveal。
-11. 导出 config JSON。
-12. 在测试环境中执行 full backup/restore。
-
----
-
-## Build outputs
-
-Tauri build artifacts 位于：
-
-```text
-src-tauri/target/release/bundle/
-```
-
-Windows 通常包含：
-
-```text
-src-tauri/target/release/bundle/nsis/*.exe
-src-tauri/target/release/bundle/msi/*.msi
+npm run dev
 ```
 
 ---
 
-## 安全模型
+## 简洁技术栈
 
-- 外部网站运行在 native webview 中。
-- Profile 通过独立 data directory 隔离 browser storage。
-- Full backup 可能包含 cookie/session，应视为私密数据；session restore 是 best-effort，跨电脑或跨 Windows 用户时可能无法保留 Google/Facebook 或其他受保护网站的登录状态。同一台机器且同一 Windows 用户下恢复时，也只有 WebView 和网站保护机制允许才可能保留 session。
-- Tauri config 中关闭 CSP 是为了支持任意外部网站，这是 browser-shell app 的有意 tradeoff。
-- 不要向不可信外部 web content 暴露 privileged Tauri commands。
+| Layer | Technology |
+|---|---|
+| Desktop runtime | Tauri 2 |
+| Frontend | React 19 + TypeScript + Vite 7 |
+| Native backend | Rust |
+| State storage | `localStorage` |
+| Session isolation | Tauri webview `data_directory` per profile |
+| Styling | Plain CSS |
+| Tests | Vitest + Testing Library + jsdom |
 
 ---
 
-## Troubleshooting
+## Development
 
-### 网站在 web dev mode 中无法渲染
-
-很多 AI 网站会阻止 iframe，这是正常现象。请使用 desktop mode：
-
-```bash
-npm run tauri dev
-```
-
-### WSL 中 npm binaries 报 Permission denied
-
-```bash
-chmod +x node_modules/.bin/vitest node_modules/.bin/tsc node_modules/.bin/vite node_modules/.bin/tauri
-```
-
-### 缺少 Rollup optional dependency
+常用命令：
 
 ```bash
 npm install
+npm run dev
+npm run tauri dev
+npm run build
+npm run tauri build
+npm test
 ```
 
-### Linux build 缺少 `dbus-1` 或 `webkit2gtk-4.1`
+Linux/WSL build 需要 Tauri native dependencies，例如 `libwebkit2gtk-4.1-dev`、`libgtk-3-dev`、`libayatana-appindicator3-dev`、`librsvg2-dev`、`patchelf`、`build-essential` 和 `libssl-dev`。
 
-安装 Linux/WSL requirements 中列出的系统包。
+修改 native webview、session、downloads、backup/restore 或 updater 相关功能时，请 smoke-test desktop app，不要只依赖 web dev mode。
 
 ---
 

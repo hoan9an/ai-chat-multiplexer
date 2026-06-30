@@ -1,280 +1,128 @@
 # AI Chat Multiplexer
 
-Không gian làm việc desktop để chạy nhiều phiên chat AI song song, kèm hệ thống profile tách biệt kiểu Chrome để dùng nhiều tài khoản cùng lúc.
+Trung tâm làm việc desktop local-first để so sánh, điều phối và giữ nhiều phiên chat AI chạy song song.
 
-![Status](https://img.shields.io/badge/status-active-success) ![Tauri](https://img.shields.io/badge/Tauri-2-orange) ![React](https://img.shields.io/badge/React-19-blue) ![License](https://img.shields.io/badge/license-MIT-green)
+![Status](https://img.shields.io/badge/status-active-success) ![Version](https://img.shields.io/badge/version-0.1.10-blue) ![Tauri](https://img.shields.io/badge/Tauri-2-orange) ![React](https://img.shields.io/badge/React-19-blue) ![License](https://img.shields.io/badge/license-MIT-green)
 
 Ngôn ngữ: [English](./README.md) · [Tiếng Việt](./README.vi.md) · [中文](./README.zh.md)
 
 ---
 
-## Tổng quan
+## Một workspace. Mọi cuộc trò chuyện AI.
 
-AI Chat Multiplexer là ứng dụng desktop local-first dành cho người thường xuyên làm việc với nhiều công cụ AI cùng lúc. Thay vì mở hàng chục tab trình duyệt, bạn có thể chia một cửa sổ thành nhiều pane và chạy Claude, ChatGPT, Gemini, Perplexity, DeepSeek, công cụ local hoặc bất kỳ URL nào cạnh nhau.
+AI Chat Multiplexer biến desktop của bạn thành một phòng điều phối AI tập trung: Claude ở một pane, ChatGPT ở pane khác, Gemini cạnh công cụ nghiên cứu, còn tài khoản Work/Personal được tách biệt an toàn.
 
-Ứng dụng dùng native Tauri webview thật thay vì iframe, nên các trang AI hiện đại chặn iframe vẫn có thể chạy bình thường trong desktop app.
+Không còn săn tab. Không còn đăng nhập qua lại. Không còn mất context khi một model vẫn đang suy nghĩ.
 
----
+![Ảnh xem trước workspace desktop của AI Chat Multiplexer](./docs/assets/ai-multiplexer-hero.png)
 
-## Vì sao có dự án này?
-
-Khi làm việc với AI, bạn thường cần:
-
-- hỏi nhiều model cùng một câu,
-- để một AI viết trong khi AI khác nghiên cứu,
-- so sánh tài khoản Work và Personal,
-- chờ phản hồi dài rồi chuyển sang việc khác,
-- giữ nhiều context theo từng dự án.
-
-Tab trình duyệt bình thường rất nhanh bị rối. AI Chat Multiplexer mang cách làm việc kiểu terminal multiplexer vào workflow AI: nhiều pane, nhiều tab, profile riêng, một workspace tập trung.
+<p align="center">
+  <a href="https://github.com/hoan9an/ai-chat-multiplexer/releases/latest"><strong>Tải bản mới nhất</strong></a>
+  ·
+  <a href="https://github.com/hoan9an/ai-chat-multiplexer/releases/tag/v0.1.10">Xem v0.1.10</a>
+  ·
+  <a href="#quick-start">Chạy từ source</a>
+</p>
 
 ---
 
-## Tính năng chính
+## Dành cho cách làm việc của power user AI
 
-### Workspace
+Công việc với AI hiện đại hiếm khi chỉ là một khung chat. Bạn cần so sánh câu trả lời, chạy prompt song song, giữ context theo dự án và chuyển đổi giữa nhiều tài khoản. Trình duyệt làm được, nhưng tab rất nhanh trở nên rối và dễ đứt mạch.
 
-- Tạo nhiều workspace như `Work`, `Personal`, `Research` hoặc theo từng project.
-- Mỗi workspace có layout pane riêng.
-- Đổi tên/xóa workspace trong app.
-- Trạng thái app được khôi phục khi mở lại.
+AI Chat Multiplexer mang trải nghiệm kiểu terminal multiplexer vào workflow AI:
 
-### Layout linh hoạt
+- hỏi nhiều model cùng một câu và so sánh phản hồi theo thời gian thực;
+- đặt research, writing, coding và review chat cạnh nhau;
+- tách tài khoản khách hàng, công việc, cá nhân và thử nghiệm bằng profile riêng;
+- giữ các phiên quan trọng sau khi mở lại app;
+- dùng được các website AI chặn iframe nhờ native Tauri webview.
 
-- Focus mode cho một pane.
-- Layout 2 cột, 3 cột, 4 cột.
-- Số cột tự động giới hạn theo số pane.
-- Kéo thả để đổi vị trí pane.
-- Phóng to một pane mà không mất workspace hiện tại.
+---
 
-### Profile kiểu Chrome
+## Điểm nổi bật
 
-Profile là container session trình duyệt, không phải preset riêng cho từng AI provider.
+### Workspace AI nhiều pane
 
-- Mỗi profile có thư mục cookie/storage/session riêng.
-- Có thể dùng `Work`, `Personal` hoặc tên bất kỳ.
-- Nhiều pane dùng cùng profile sẽ dùng chung đăng nhập/session.
-- Profile khác nhau sẽ tách biệt tài khoản.
-- Đóng pane không xóa profile/session.
-- Không thể xóa profile khi còn pane đang sử dụng.
+Chia một cửa sổ desktop thành các pane tập trung. Dùng focus mode, layout 2 cột, 3 cột hoặc 4 cột, rồi kéo thả pane theo đúng nhịp làm việc của bạn.
 
-### Tab trong pane
+### Profile tách biệt kiểu Chrome
 
-- Mỗi pane có nhiều tab.
-- Mỗi tab có URL, title, favicon và trạng thái loading riêng.
-- URL bar hỗ trợ URL trực tiếp, localhost và search query.
-- Có back, forward, reload cho tab đang active.
-- Kéo thả để sắp xếp tab.
-- Di chuyển tab sang pane khác nếu cùng profile.
-- Tách tab thành pane mới.
+Profile là container session trình duyệt thật. Mỗi profile có cookie, storage, cache và login session riêng, nên tài khoản Work và Personal có thể đăng nhập cùng lúc mà không lẫn dữ liệu.
 
-### Native webview engine
+### Tab trong từng pane
 
-Nhiều website AI chặn iframe bằng `X-Frame-Options` hoặc CSP. AI Chat Multiplexer tránh vấn đề đó bằng Tauri native child webview.
+Mỗi pane có thể chứa nhiều tab với URL, title, favicon và trạng thái loading riêng. Bạn có thể sắp xếp lại tab, chuyển tab giữa các pane cùng profile, hoặc tách tab thành pane mới.
 
-Luồng hoạt động:
+### Native webview, không phải iframe mong manh
 
-1. React render một `webview-shell` làm khung trống cho pane active.
-2. React đo vị trí/kích thước khung đó.
-3. Tauri tạo hoặc di chuyển native webview khớp với khung.
-4. Webview dùng session directory của profile được chọn.
-5. Khi menu, modal, download panel hoặc drag overlay mở, native webview được ẩn để không che UI React.
+Nhiều dịch vụ AI chặn iframe bằng CSP hoặc `X-Frame-Options`. AI Chat Multiplexer dùng Tauri native child webview, nên các trang đó hoạt động như bề mặt trình duyệt desktop bình thường.
 
-### Downloads
+### Local-first
 
-- Download trong native webview được xử lý bởi Rust/Tauri.
-- App hiển thị toast download.
-- Có thể mở file hoặc mở thư mục chứa file sau khi tải xong.
-- Có workaround cho WebView2 trên Windows khi sự kiện download finished không ổn định.
+Workspace, pane, tab, profile, theme và layout được lưu cục bộ. App đóng vai trò desktop shell cho các dịch vụ bạn chọn, không phải proxy hosted cho nội dung chat của bạn.
 
 ### Backup và restore
 
-- Xuất/nhập cấu hình app dạng JSON.
-- Full backup có thể bao gồm trạng thái app (workspace, pane, tab, mapping profile) và file session profile dạng ZIP.
-- Restore trạng thái app và file session profile từ ZIP; restore session là best-effort.
+Xuất/nhập cấu hình dạng JSON, hoặc tạo full backup ZIP có thể bao gồm workspace, pane, tab, mapping profile và file session profile. Full backup có thể chứa cookie/session nên cần coi như dữ liệu riêng tư. Restore session là best-effort; các trang được bảo vệ vẫn có thể yêu cầu đăng nhập lại khi đổi máy hoặc đổi Windows user.
 
-> **Lưu ý bảo mật và tính di động:** full backup có thể chứa cookie/session và phải coi như dữ liệu riêng tư. Restore session không giải mã, export hay thao tác cookie/token/DPAPI/app-bound encryption. Khi restore sang máy khác hoặc Windows user khác, Google/Facebook và các trang được bảo vệ có thể yêu cầu đăng nhập lại. Trên cùng máy và cùng Windows user, session chỉ có thể được giữ khi WebView và site protection cho phép.
+### Sẵn sàng auto-update
 
-### Cập nhật
-
-- App có thể kiểm tra GitHub release mới nhất.
-- Trong desktop app, bản phát hành mới đã ký có thể được tải về, cài đặt và relaunch qua Tauri updater; fallback non-Tauri/web sẽ mở trang release.
+Desktop app có thể kiểm tra GitHub release. Bản phát hành đã ký có thể được tải, cài đặt và relaunch qua Tauri updater; môi trường fallback sẽ mở trang release.
 
 ---
 
-## Công nghệ
+## Workflow thường dùng
 
-| Layer | Công nghệ |
+| Workflow | AI Chat Multiplexer hỗ trợ như thế nào |
 |---|---|
-| Frontend | React 19 + TypeScript + Vite 7 |
-| Desktop runtime | Tauri 2 |
-| Native backend | Rust |
-| State storage | `localStorage` |
-| Browser session storage | Tauri webview `data_directory` theo từng profile |
-| Styling | CSS thuần |
-| Tests | Vitest + Testing Library + jsdom |
-| Icons | Inline custom SVG components |
+| So sánh model | Mở Claude, ChatGPT, Gemini và Perplexity cạnh nhau rồi hỏi cùng một câu. |
+| Research + viết nháp | Giữ pane research luôn thấy được trong khi AI khác viết, chỉnh sửa hoặc tóm tắt. |
+| Tách tài khoản | Dùng profile Work, Personal, Client hoặc Lab với session đăng nhập riêng. |
+| Prompt chạy lâu | Để một model suy nghĩ trong khi bạn tiếp tục làm việc ở pane khác. |
+| Context theo dự án | Tạo workspace riêng cho khách hàng, repo, chủ đề hoặc thử nghiệm. |
+| Công cụ local | Mở app localhost, docs, dashboard hoặc công cụ AI local cạnh chat AI hosted. |
 
 ---
 
-## Cấu trúc project
+## Mô hình riêng tư và bảo mật
 
-```text
-.
-├── src/
-│   ├── App.tsx                         # Composition root
-│   ├── appCore.ts                      # Types, constants, helpers, migrations
-│   ├── newtab.ts                       # New-tab URL helpers
-│   ├── main.tsx                        # React entrypoint
-│   ├── App.css                         # Theme và layout styles
-│   ├── Icons.tsx                       # Inline SVG icons
-│   ├── components/                     # UI components
-│   ├── hooks/                          # State/effects/actions hooks
-│   └── types/
-├── src-tauri/
-│   ├── src/lib.rs                      # Tauri commands và native backend
-│   ├── Cargo.toml
-│   ├── Cargo.lock
-│   └── tauri.conf.json
-├── public/
-├── scripts/
-├── package.json
-└── README.md
-```
+AI Chat Multiplexer được thiết kế local-first:
+
+- website AI bên ngoài chạy trong native desktop webview;
+- browser storage được tách theo profile bằng data directory riêng;
+- trạng thái workspace được lưu cục bộ;
+- full backup có thể bao gồm file session nhạy cảm và cần được bảo vệ tương ứng;
+- restore session không giải mã, export hay vượt qua cookie, token, DPAPI, app-bound encryption hoặc cơ chế bảo vệ của website.
+
+Vì đây là desktop app kiểu browser shell, chỉ nên dùng với dịch vụ tin cậy và tránh expose privileged Tauri commands cho web content không tin cậy.
 
 ---
 
-## Kiến trúc
+## Quick start
 
-### Data model
+### Tải app
 
-```text
-AppState
-├── workspaces[]
-│   └── panes[]
-│       └── tabs[]
-└── profiles[]
-```
+Lấy installer mới nhất từ GitHub Releases:
 
-Ý nghĩa:
+- Latest release: <https://github.com/hoan9an/ai-chat-multiplexer/releases/latest>
+- Current app version: `0.1.10`
 
-- Workspace: không gian làm việc/layout riêng.
-- Pane: một vùng browser/chat.
-- Tab: nhiều trang/chat trong một pane.
-- Profile: container cookie/session riêng.
+Trên Windows, cài artifact `.exe`/`.msi` từ trang release. Microsoft Edge WebView2 Runtime là bắt buộc và thường đã có sẵn trên Windows 10/11.
 
-### Ý nghĩa các URL field
+### Chạy từ source
 
-App tách rõ URL do app chủ động load và URL quan sát được từ webview:
+Yêu cầu:
 
-- `loadedUrl`: URL cuối cùng app chủ động yêu cầu native webview load.
-- `currentUrl`: URL quan sát được từ native webview sau redirect hoặc SPA route change.
-- Address bar hiển thị URL quan sát được, nhưng SPA route change không được feed ngược vào `load_url`, nếu không Gemini hoặc các SPA khác có thể reload và mất state trong trang.
-
-### Native webview lifecycle
-
-```text
-React Pane
-  └── webview-shell DOM rectangle
-        ↓
-useNativeWebviews
-  └── native_webview_upsert(profileId, label, url, x, y, width, height)
-        ↓
-Rust/Tauri
-  └── WebviewBuilder::new(label, url)
-      .data_directory(profile_session_directory)
-      .enable_clipboard_access()
-```
-
-Label native webview dựa trên tab ID để khi di chuyển tab, webview/session không bị hủy.
-
-### Cô lập profile session
-
-Mỗi profile ánh xạ tới thư mục session riêng:
-
-```text
-app_data_dir/pane-sessions/<profile_id>/
-```
-
-Cookie, localStorage, IndexedDB, cache và login session được tách biệt theo profile.
-
----
-
-## Invariant quan trọng
-
-Khi sửa app, cần giữ các luật sau:
-
-1. Native webview label phải ổn định theo tab.
-2. Profile ID phải map tới `data_directory` riêng.
-3. Pane không được rỗng vĩnh viễn.
-4. Workspace phải có fallback active hợp lệ.
-5. Chỉ cho move tab cross-pane khi cùng profile.
-6. Native webview phải ẩn khi menu/modal/download panel/drag overlay mở.
-7. Polling status từ native webview không được tự gây reload.
-8. Migration state phải giữ dữ liệu user.
-
----
-
-## Yêu cầu hệ thống
-
-### Chung
-
-- Node.js 20+ khuyến nghị
+- Node.js 20+
 - npm
 - Rust stable
 - Desktop environment được Tauri hỗ trợ
-
-### Windows
-
-- Windows 10/11
-- Microsoft Edge WebView2 Runtime
-- Visual Studio 2022 Build Tools với C++ workload
-- Rust MSVC toolchain
-
-### Linux/WSL
-
-```bash
-sudo apt-get update
-sudo apt-get install -y \
-  libdbus-1-dev \
-  libwebkit2gtk-4.1-dev \
-  libgtk-3-dev \
-  libayatana-appindicator3-dev \
-  librsvg2-dev \
-  patchelf \
-  build-essential \
-  curl \
-  wget \
-  file \
-  libssl-dev
-```
-
----
-
-## Cài đặt và chạy
-
-Cài dependencies:
+- Windows: Visual Studio 2022 Build Tools với C++ workload và Rust MSVC toolchain
 
 ```bash
 npm install
-```
-
-Chạy web-only dev mode:
-
-```bash
-npm run dev
-```
-
-Chạy desktop dev mode:
-
-```bash
 npm run tauri dev
-```
-
-Build frontend:
-
-```bash
-npm run build
 ```
 
 Build desktop app:
@@ -283,101 +131,44 @@ Build desktop app:
 npm run tauri build
 ```
 
----
-
-## Testing
-
-Chạy toàn bộ test:
+Web-only development cũng có sẵn, nhưng nhiều website AI chủ động chặn iframe. Hãy dùng desktop mode để kiểm thử sát thực tế.
 
 ```bash
-npm test
-```
-
-Watch mode:
-
-```bash
-npm run test:watch
-```
-
-Vitest UI:
-
-```bash
-npm run test:ui
-```
-
-Test suite bao phủ state helpers, migrations, pane/tab behavior, native webview sync, backup/update, download manager và components.
-
----
-
-## Manual desktop smoke test
-
-1. Mở desktop app.
-2. Mở hai pane cùng profile và xác nhận session được share.
-3. Mở hai pane khác profile và xác nhận login tách biệt.
-4. Mở Gemini, tạo chat mới, gõ một tin nhắn và xác nhận không bị flicker/reload mất conversation.
-5. Mở Settings khi webview đang hiện và xác nhận modal không bị che.
-6. Kéo pane và xác nhận webview ẩn/hiện đúng.
-7. Kéo tab trong pane.
-8. Kéo tab sang pane cùng profile.
-9. Xác nhận tab khác profile không move được.
-10. Tải file và kiểm tra toast/open/reveal.
-11. Export config JSON.
-12. Full backup/restore trong môi trường test.
-
----
-
-## Build outputs
-
-Tauri build artifacts nằm ở:
-
-```text
-src-tauri/target/release/bundle/
-```
-
-Trên Windows thường có:
-
-```text
-src-tauri/target/release/bundle/nsis/*.exe
-src-tauri/target/release/bundle/msi/*.msi
+npm run dev
 ```
 
 ---
 
-## Bảo mật
+## Tech stack gọn
 
-- External websites chạy trong native webview.
-- Profile tách browser storage bằng data directory riêng.
-- Full backup có thể chứa cookie/session và phải coi như dữ liệu riêng tư; restore session là best-effort và có thể không giữ đăng nhập Google/Facebook hoặc trang được bảo vệ khi đổi máy hoặc Windows user. Restore trên cùng máy/cùng Windows user chỉ có thể giữ session khi WebView và site protection cho phép.
-- CSP trong Tauri config được tắt để hỗ trợ nhiều external sites; đây là tradeoff có chủ đích cho browser-shell app.
-- Không expose privileged Tauri commands cho web content không tin cậy.
+| Layer | Công nghệ |
+|---|---|
+| Desktop runtime | Tauri 2 |
+| Frontend | React 19 + TypeScript + Vite 7 |
+| Native backend | Rust |
+| State storage | `localStorage` |
+| Session isolation | Tauri webview `data_directory` theo từng profile |
+| Styling | CSS thuần |
+| Tests | Vitest + Testing Library + jsdom |
 
 ---
 
-## Troubleshooting
+## Development
 
-### Website không render trong web dev mode
-
-Đây là bình thường với nhiều AI sites vì iframe bị chặn. Hãy dùng desktop mode:
-
-```bash
-npm run tauri dev
-```
-
-### WSL báo Permission denied với npm binaries
-
-```bash
-chmod +x node_modules/.bin/vitest node_modules/.bin/tsc node_modules/.bin/vite node_modules/.bin/tauri
-```
-
-### Rollup optional dependency bị thiếu
+Các lệnh hữu ích:
 
 ```bash
 npm install
+npm run dev
+npm run tauri dev
+npm run build
+npm run tauri build
+npm test
 ```
 
-### Linux build thiếu `dbus-1` hoặc `webkit2gtk-4.1`
+Build trên Linux/WSL cần các dependency native của Tauri như `libwebkit2gtk-4.1-dev`, `libgtk-3-dev`, `libayatana-appindicator3-dev`, `librsvg2-dev`, `patchelf`, `build-essential` và `libssl-dev`.
 
-Cài các package Linux/WSL ở phần yêu cầu hệ thống.
+Khi sửa native webview, session, download, backup/restore hoặc updater, hãy smoke-test desktop app thay vì chỉ dựa vào web dev mode.
 
 ---
 
