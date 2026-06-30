@@ -1885,6 +1885,8 @@ button:focus-visible {
 
 .landing-brand,
 .landing-links,
+.landing-nav-actions,
+.landing-language-switcher,
 .landing-actions,
 .landing-service-strip,
 .landing-btn,
@@ -1938,8 +1940,45 @@ button:focus-visible {
   background: rgba(255, 255, 255, 0.06);
 }
 
-.landing-nav-cta {
+.landing-nav-actions {
   justify-self: end;
+  gap: 10px;
+}
+
+.landing-language-switcher {
+  gap: 3px;
+  padding: 4px;
+  border: 1px solid var(--landing-border);
+  border-radius: 999px;
+  background: rgba(9, 8, 5, 0.62);
+}
+
+.landing-language-switcher button {
+  min-width: 34px;
+  height: 30px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 999px;
+  color: var(--landing-muted);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: -0.02em;
+  transition: color 140ms ease, background 140ms ease;
+}
+
+.landing-language-switcher button:hover {
+  color: var(--landing-text);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.landing-language-switcher button.active {
+  color: #1a1408;
+  background: var(--landing-accent);
+}
+
+
+.landing-nav-cta {
   padding: 10px 14px;
   border: 1px solid var(--landing-border-strong);
   border-radius: 999px;
@@ -2377,6 +2416,15 @@ button:focus-visible {
     display: none;
   }
 
+  .landing-nav-actions {
+    gap: 6px;
+  }
+
+  .landing-language-switcher button {
+    min-width: 30px;
+    padding: 0 7px;
+  }
+
   .landing-nav-cta {
     padding: 9px 12px;
   }
@@ -2401,6 +2449,17 @@ button:focus-visible {
 
   .feature-card span {
     margin-bottom: 34px;
+  }
+}
+
+
+@media (max-width: 560px) {
+  .landing-brand span:last-child {
+    display: none;
+  }
+
+  .landing-nav-cta {
+    display: none;
   }
 }
 

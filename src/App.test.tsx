@@ -265,7 +265,7 @@ describe("App", () => {
     vi.mocked(isTauriRuntime).mockReturnValue(false);
     const { getByText, queryByTestId } = render(<App />);
 
-    expect(getByText("Run every AI conversation like an operations room.")).toBeDefined();
+    expect(getByText("Vận hành mọi cuộc trò chuyện AI như một phòng điều phối.")).toBeDefined();
     expect(queryByTestId("app-header")).toBeNull();
     expect(appHeaderProps).not.toHaveBeenCalled();
   });
