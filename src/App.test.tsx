@@ -163,6 +163,14 @@ vi.mock("./hooks/useProfileWorkspaceActions", () => ({
   }),
 }));
 
+vi.mock("./appCore", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./appCore")>();
+  return {
+    ...actual,
+    isTauriRuntime: vi.fn(() => true),
+  };
+});
+
 // Stub child components so we only verify App's wiring of them.
 const appHeaderProps = vi.fn();
 const paneGridProps = vi.fn();
@@ -187,12 +195,14 @@ vi.mock("./components/AppOverlays", () => ({
   },
 }));
 
+import { isTauriRuntime } from "./appCore";
 import App from "./App";
 
 afterEach(cleanup);
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(isTauriRuntime).mockReturnValue(true);
 });
 
 describe("App", () => {
@@ -248,5 +258,15 @@ describe("App", () => {
     expect(props.openFile).toBe(openFile);
     expect(props.revealFolder).toBe(revealFolder);
     expect(props.clearAll).toBe(clearAll);
+  });
+
+
+  it("renders the marketing landing page outside Tauri", () => {
+    vi.mocked(isTauriRuntime).mockReturnValue(false);
+    const { getByText, queryByTestId } = render(<App />);
+
+    expect(getByText("Run every AI conversation like an operations room.")).toBeDefined();
+    expect(queryByTestId("app-header")).toBeNull();
+    expect(appHeaderProps).not.toHaveBeenCalled();
   });
 });

@@ -3,6 +3,8 @@ import "./App.css";
 import { AppOverlays } from "./components/AppOverlays";
 import { PaneGrid } from "./components/PaneGrid";
 import { AppHeader } from "./components/AppHeader";
+import { LandingPage } from "./components/LandingPage";
+import { isTauriRuntime } from "./appCore";
 import { useAppPersistence } from "./hooks/useAppPersistence";
 import { useDragState } from "./hooks/useDragState";
 import { useDerivedWorkspaceState } from "./hooks/useDerivedWorkspaceState";
@@ -17,7 +19,7 @@ import { usePromptDialogs } from "./hooks/usePromptDialogs";
 import { useProfileWorkspaceActions } from "./hooks/useProfileWorkspaceActions";
 import { useTranslation } from "./i18n";
 
-function App() {
+function DesktopApp() {
   const { lang } = useTranslation();
   const { state, setState, theme, setTheme } = useAppPersistence();
   const [focusedPaneId, setFocusedPaneId] = useState<string | null>(null);
@@ -242,6 +244,14 @@ function App() {
       />
     </main>
   );
+}
+
+function App() {
+  if (!isTauriRuntime()) {
+    return <LandingPage />;
+  }
+
+  return <DesktopApp />;
 }
 
 export default App;
