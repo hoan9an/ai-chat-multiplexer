@@ -225,13 +225,16 @@ describe("SettingsModal", () => {
     expect(restore.disabled).toBe(true);
   });
 
-  it("GitHub footer link calls onOpenReleasePage instead of navigating", () => {
+  it("footer links open website and GitHub through onOpenReleasePage", () => {
     const props = defaultProps();
     render(<SettingsModal {...props} />);
+
+    fireEvent.click(screen.getByRole("link", { name: "Website" }));
     fireEvent.click(screen.getByRole("link", { name: "GitHub" }));
-    expect(props.onOpenReleasePage).toHaveBeenCalledTimes(1);
-    const arg = (props.onOpenReleasePage as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    expect(typeof arg).toBe("string");
-    expect(arg).toMatch(/github\.com/i);
+
+    expect(props.onOpenReleasePage).toHaveBeenCalledTimes(2);
+    const calls = (props.onOpenReleasePage as ReturnType<typeof vi.fn>).mock.calls;
+    expect(calls[0][0]).toMatch(/github\.io\/ai-chat-multiplexer/i);
+    expect(calls[1][0]).toMatch(/github\.com/i);
   });
 });

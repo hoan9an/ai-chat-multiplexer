@@ -20,6 +20,7 @@ export const en: Dictionary = {
   "settings.langChinese": "中文",
   "settings.updates": "Updates",
   "settings.currentVersion": "Current version",
+  "settings.website": "Website",
   "settings.backupRestore": "Backup & restore",
 
   // Updates

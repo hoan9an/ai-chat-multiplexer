@@ -24,6 +24,7 @@ export const vi = {
   "settings.langChinese": "中文",
   "settings.updates": "Cập nhật",
   "settings.currentVersion": "Phiên bản hiện tại",
+  "settings.website": "Website",
   "settings.backupRestore": "Backup & khôi phục",
 
   // Updates

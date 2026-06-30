@@ -3,10 +3,13 @@ import react from "@vitejs/plugin-react";
 
 // @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
+// @ts-expect-error process is a nodejs global
+const isGitHubPages = process.env.GITHUB_PAGES === "true";
 
 // https://vite.dev/config/
 export default defineConfig(async () => ({
   plugins: [react()],
+  base: isGitHubPages ? "/ai-chat-multiplexer/" : "/",
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //

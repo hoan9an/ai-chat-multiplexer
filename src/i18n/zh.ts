@@ -20,6 +20,7 @@ export const zh: Dictionary = {
   "settings.langChinese": "中文",
   "settings.updates": "更新",
   "settings.currentVersion": "当前版本",
+  "settings.website": "官网",
   "settings.backupRestore": "备份与恢复",
 
   // Updates

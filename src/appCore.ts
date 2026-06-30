@@ -69,6 +69,7 @@ export const DEFAULT_URL = "https://search.brave.com/";
 export const DEFAULT_PROFILE_ID = "prof-default";
 export const APP_VERSION = "0.1.10";
 export const GITHUB_REPO = "hoan9an/ai-chat-multiplexer";
+export const WEBSITE_URL = "https://hoan9an.github.io/ai-chat-multiplexer/";
 export const RELEASES_URL = `https://github.com/${GITHUB_REPO}/releases/latest`;
 
 import { isNewTabUrl, NEW_TAB_TITLE } from "./newtab";

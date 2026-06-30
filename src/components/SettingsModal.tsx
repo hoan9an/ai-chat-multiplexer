@@ -9,7 +9,7 @@ import {
   IconUpload,
   IconX,
 } from "../Icons";
-import { APP_VERSION, GITHUB_REPO, isTauriRuntime, type ThemeMode } from "../appCore";
+import { APP_VERSION, GITHUB_REPO, WEBSITE_URL, isTauriRuntime, type ThemeMode } from "../appCore";
 import { useTranslation, type Lang } from "../i18n";
 
 void _IconSettings; // re-exported indirectly so the file remains stable on tree-shake
@@ -245,17 +245,30 @@ export function SettingsModal({
         </section>
 
         <footer className="settings-footer">
-          <a
-            href={`https://github.com/${GITHUB_REPO}`}
-            target="_blank"
-            rel="noreferrer"
-            onClick={(event) => {
-              event.preventDefault();
-              onOpenReleasePage(`https://github.com/${GITHUB_REPO}`);
-            }}
-          >
-            GitHub
-          </a>
+          <div className="settings-footer-links">
+            <a
+              href={WEBSITE_URL}
+              target="_blank"
+              rel="noreferrer"
+              onClick={(event) => {
+                event.preventDefault();
+                onOpenReleasePage(WEBSITE_URL);
+              }}
+            >
+              {t("settings.website")}
+            </a>
+            <a
+              href={`https://github.com/${GITHUB_REPO}`}
+              target="_blank"
+              rel="noreferrer"
+              onClick={(event) => {
+                event.preventDefault();
+                onOpenReleasePage(`https://github.com/${GITHUB_REPO}`);
+              }}
+            >
+              GitHub
+            </a>
+          </div>
           <span className="settings-meta">v{APP_VERSION}</span>
         </footer>
       </div>
