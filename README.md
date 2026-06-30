@@ -98,7 +98,7 @@ How it works:
 ### Updates
 
 - The app can check the latest GitHub release.
-- If a newer version is available, it opens the release page.
+- In the desktop app, a newer signed release can be downloaded, installed, and relaunched through the Tauri updater; non-Tauri/web fallback opens the release page.
 
 ---
 
@@ -458,7 +458,7 @@ Install Visual Studio 2022 Build Tools with the C++ workload, then reopen the te
 
 ## Version
 
-Current app version: `0.1.5`
+Current app version: `0.1.9`
 
 ---
 

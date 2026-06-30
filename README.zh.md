@@ -98,7 +98,7 @@ Profile 是浏览器 session 容器，而不是针对某个 AI provider 的 pres
 ### Updates
 
 - 应用可检查最新 GitHub release。
-- 如果有新版本，会打开 release 页面。
+- 在 desktop app 中，已签名的新版本可通过 Tauri updater 下载、安装并 relaunch；non-Tauri/web fallback 会打开 release 页面。
 
 ---
 
@@ -383,7 +383,7 @@ npm install
 
 ## 版本
 
-Current app version: `0.1.5`
+Current app version: `0.1.9`
 
 ---
 

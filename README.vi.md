@@ -98,7 +98,7 @@ Luồng hoạt động:
 ### Cập nhật
 
 - App có thể kiểm tra GitHub release mới nhất.
-- Nếu có phiên bản mới, app mở trang release.
+- Trong desktop app, bản phát hành mới đã ký có thể được tải về, cài đặt và relaunch qua Tauri updater; fallback non-Tauri/web sẽ mở trang release.
 
 ---
 
@@ -383,7 +383,7 @@ Cài các package Linux/WSL ở phần yêu cầu hệ thống.
 
 ## Phiên bản
 
-Current app version: `0.1.5`
+Current app version: `0.1.9`
 
 ---
 
