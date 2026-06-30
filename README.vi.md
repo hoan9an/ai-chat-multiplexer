@@ -383,7 +383,7 @@ Cài các package Linux/WSL ở phần yêu cầu hệ thống.
 
 ## Phiên bản
 
-Current app version: `0.1.9`
+Current app version: `0.1.10`
 
 ---
 

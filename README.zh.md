@@ -383,7 +383,7 @@ npm install
 
 ## 版本
 
-Current app version: `0.1.9`
+Current app version: `0.1.10`
 
 ---
 

@@ -458,7 +458,7 @@ Install Visual Studio 2022 Build Tools with the C++ workload, then reopen the te
 
 ## Version
 
-Current app version: `0.1.9`
+Current app version: `0.1.10`
 
 ---
 
