@@ -3,6 +3,7 @@ import type { MutableRefObject } from "react";
 import { useEffect, useRef } from "react";
 import {
   getNativeWebviewLabel,
+  isAllowedWebviewUrl,
   isTauriRuntime,
   normalizeUrl,
   type AppState,
@@ -52,16 +53,19 @@ export function useNativeWebviews({ state, focusedPaneId, suspended, shellsRef, 
 
         workspace.panes.forEach((pane) => {
           const shell = shellsRef.current[pane.id];
-          const profileSessionId = pane.profileId.replace(/[^a-zA-Z0-9_-]/g, "-");
           const isPaneVisible = !focusedPaneId || focusedPaneId === pane.id;
 
           pane.tabs.forEach((tab) => {
+            const label = getNativeWebviewLabel(pane.id, tab);
             // Drive native loads from the last explicit URL the shell commanded.
             // currentUrl is only the URL observed from the webview (SPA routing,
             // redirects, history changes) and must not be fed back into load_url.
             const targetUrl = tab.loadedUrl || tab.url || tab.currentUrl || "";
             const normalizedUrl = normalizeUrl(withNewTabLang(targetUrl, lang));
-            const label = getNativeWebviewLabel(pane.id, tab);
+            if (!isAllowedWebviewUrl(normalizedUrl) || normalizedUrl.includes("/newtab.html")) {
+              void invoke("native_webview_hide", { label }).catch(() => undefined);
+              return;
+            }
             allLabels.add(label);
 
             const canBeVisible =
@@ -76,6 +80,7 @@ export function useNativeWebviews({ state, focusedPaneId, suspended, shellsRef, 
               return;
             }
 
+            const profileSessionId = pane.profileId.replace(/[^a-zA-Z0-9_-]/g, "-");
             const bounds = shell!.getBoundingClientRect();
             visibleLabels.add(label);
 

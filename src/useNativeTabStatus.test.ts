@@ -350,6 +350,64 @@ describe("useNativeTabStatus", () => {
     expect(updated.tabs[0].currentUrl).toBe("https://only-loaded.example");
   });
 
+  it("does not recreate the interval (no immediate re-poll) when re-rendered with a fresh array of the same tabs", async () => {
+    invokeSpy.mockResolvedValue({
+      title: "T",
+      url: "https://x.com",
+      faviconUrl: "",
+      isLoading: false,
+    });
+    const updateActivePane = vi.fn();
+    // Fresh array + fresh callback each render, but the same visible tab set.
+    const { rerender } = renderHook(
+      ({ panes }) =>
+        useNativeTabStatus({
+          activePanes: panes,
+          focusedPaneId: null,
+          updateActivePane: () => updateActivePane(),
+        }),
+      { initialProps: { panes: [makePane("p1", "t1")] } },
+    );
+
+    // One immediate poll on mount.
+    await waitFor(() => expect(invokeSpy).toHaveBeenCalledTimes(1));
+
+    // Re-render several times with brand-new array identities (simulating the
+    // poll-driven re-renders). The interval must NOT tear down/recreate, so no
+    // extra immediate poll should fire.
+    for (let i = 0; i < 3; i += 1) {
+      rerender({ panes: [makePane("p1", "t1")] });
+    }
+    await Promise.resolve();
+    expect(invokeSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("recreates the interval and polls immediately when the visible tab set changes", async () => {
+    invokeSpy.mockResolvedValue({
+      title: "T",
+      url: "https://x.com",
+      faviconUrl: "",
+      isLoading: false,
+    });
+    const updateActivePane = vi.fn();
+    const { rerender } = renderHook(
+      ({ panes }) =>
+        useNativeTabStatus({
+          activePanes: panes,
+          focusedPaneId: null,
+          updateActivePane,
+        }),
+      { initialProps: { panes: [makePane("p1", "t1")] } },
+    );
+
+    await waitFor(() => expect(invokeSpy).toHaveBeenCalledTimes(1));
+
+    // Switch the active tab → the polled label set changes → interval recreated,
+    // firing a fresh immediate poll.
+    rerender({ panes: [makePane("p1", "t2")] });
+    await waitFor(() => expect(invokeSpy).toHaveBeenCalledTimes(2));
+  });
+
   it("falls back to getFallbackTabTitle when status.title is whitespace", async () => {
     invokeSpy.mockResolvedValue({
       title: "   ",

@@ -11,6 +11,7 @@ export interface UseDerivedWorkspaceStateArgs {
   draggingTabKey: string | null;
   textPrompt: unknown | null;
   confirmDialog: unknown | null;
+  alertDialog: unknown | null;
 }
 
 export interface UseDerivedWorkspaceStateResult {
@@ -45,6 +46,7 @@ export function useDerivedWorkspaceState(
     draggingTabKey,
     textPrompt,
     confirmDialog,
+    alertDialog,
   } = args;
 
   const activeWorkspace =
@@ -62,6 +64,7 @@ export function useDerivedWorkspaceState(
     draggingPaneId !== null ||
     textPrompt !== null ||
     confirmDialog !== null ||
+    alertDialog !== null ||
     isSettingsOpen ||
     isDownloadsOpen ||
     draggingTabKey !== null;

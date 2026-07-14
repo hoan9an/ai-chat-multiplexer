@@ -36,6 +36,7 @@ const idleFlags = {
   draggingTabKey: null,
   textPrompt: null,
   confirmDialog: null,
+  alertDialog: null,
 };
 
 describe("useDerivedWorkspaceState", () => {
@@ -168,6 +169,7 @@ describe("useDerivedWorkspaceState", () => {
     ["draggingTabKey", { draggingTabKey: "p1:t1" }],
     ["textPrompt", { textPrompt: { kind: "rename" } }],
     ["confirmDialog", { confirmDialog: { title: "Are you sure?" } }],
+    ["alertDialog", { alertDialog: { title: "Heads up" } }],
   ])("suspends native webviews when %s is active", (_label, override) => {
     const ws = makeWorkspace("ws1", 2, [makePane("p1")]);
     const state = makeState([ws], "ws1");

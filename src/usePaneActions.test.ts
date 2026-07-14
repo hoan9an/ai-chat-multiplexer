@@ -64,7 +64,6 @@ function setupHook(initialState: AppState) {
       active: boolean;
     } | null>(null);
     const actions = usePaneActions({
-      state,
       setState,
       focusedPaneId: null,
       paneDrag,

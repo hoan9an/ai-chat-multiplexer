@@ -3,8 +3,6 @@ import "./App.css";
 import { AppOverlays } from "./components/AppOverlays";
 import { PaneGrid } from "./components/PaneGrid";
 import { AppHeader } from "./components/AppHeader";
-import { LandingPage } from "./components/LandingPage";
-import { isTauriRuntime } from "./appCore";
 import { useAppPersistence } from "./hooks/useAppPersistence";
 import { useDragState } from "./hooks/useDragState";
 import { useDerivedWorkspaceState } from "./hooks/useDerivedWorkspaceState";
@@ -39,6 +37,8 @@ function DesktopApp() {
     setTextPromptValue,
     confirmDialog,
     setConfirmDialog,
+    alertDialog,
+    setAlertDialog,
     openTextPrompt,
     closeTextPrompt,
     submitTextPrompt,
@@ -76,6 +76,7 @@ function DesktopApp() {
     setState,
     setFocusedPaneId,
     setConfirmDialog,
+    setAlertDialog,
   });
 
   const {
@@ -95,6 +96,7 @@ function DesktopApp() {
     draggingTabKey,
     textPrompt,
     confirmDialog,
+    alertDialog,
   });
 
   useNativeWebviews({
@@ -123,7 +125,6 @@ function DesktopApp() {
     detachTabToNewPane,
     finishPaneDrag,
   } = usePaneActions({
-    state,
     setState,
     focusedPaneId,
     paneDrag,
@@ -154,7 +155,6 @@ function DesktopApp() {
     openTextPrompt,
     updateActiveWorkspace,
   });
-
 
   return (
     <main className={`app-shell theme-${theme}`}>
@@ -221,6 +221,8 @@ function DesktopApp() {
         submitTextPrompt={submitTextPrompt}
         confirmDialog={confirmDialog}
         setConfirmDialog={setConfirmDialog}
+        alertDialog={alertDialog}
+        setAlertDialog={setAlertDialog}
         isSettingsOpen={isSettingsOpen}
         setIsSettingsOpen={setIsSettingsOpen}
         theme={theme}
@@ -247,10 +249,6 @@ function DesktopApp() {
 }
 
 function App() {
-  if (!isTauriRuntime()) {
-    return <LandingPage />;
-  }
-
   return <DesktopApp />;
 }
 

@@ -13,10 +13,9 @@ import {
   type ChatTab,
   type Workspace,
 } from "../appCore";
-import { getNewTabUrl, NEW_TAB_TITLE } from "../newtab";
+import { getNewTabUrl, NEW_TAB_ICON, NEW_TAB_TITLE } from "../newtab";
 
 export interface UsePaneActionsArgs {
-  state: AppState;
   setState: React.Dispatch<React.SetStateAction<AppState>>;
   focusedPaneId: string | null;
   paneDrag: React.MutableRefObject<{
@@ -66,7 +65,6 @@ export interface PaneActions {
 }
 
 export function usePaneActions({
-  state,
   setState,
   focusedPaneId,
   paneDrag,
@@ -115,6 +113,7 @@ export function usePaneActions({
         url: newTabUrl,
         loadedUrl: newTabUrl,
         currentUrl: newTabUrl,
+        faviconUrl: NEW_TAB_ICON,
       };
 
       return {
@@ -143,6 +142,7 @@ export function usePaneActions({
               url: newTabUrl,
               loadedUrl: newTabUrl,
               currentUrl: newTabUrl,
+              faviconUrl: NEW_TAB_ICON,
             },
           ],
         };
@@ -200,7 +200,7 @@ export function usePaneActions({
                 url: newTabUrl,
                 loadedUrl: newTabUrl,
                 currentUrl: newTabUrl,
-                faviconUrl: undefined,
+                faviconUrl: NEW_TAB_ICON,
                 isLoading: false,
               }
             : tab,
@@ -415,8 +415,6 @@ export function usePaneActions({
     setDragOverPaneId(null);
   }
 
-  // Suppress unused warning for `state` if TS strict — keep arg for future use
-  void state;
 
   return {
     updateActiveWorkspace,

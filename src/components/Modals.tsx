@@ -1,12 +1,10 @@
 import { useState } from "react";
 import { useTranslation } from "../i18n";
-
-type TextPromptState = {
-  title: string;
-  initial: string;
-  placeholder?: string;
-  onSubmit: (value: string) => void;
-};
+import type {
+  AlertDialogOptions,
+  ConfirmDialogOptions,
+  TextPromptState,
+} from "../types/dialogs";
 
 export type TextPromptModalProps = {
   prompt: TextPromptState | null;
@@ -68,16 +66,8 @@ export function TextPromptModal({
   );
 }
 
-export type ConfirmDialogState = {
-  title: string;
-  message: string;
-  confirmLabel?: string;
-  danger?: boolean;
-  onConfirm: () => void | Promise<void>;
-};
-
 export type ConfirmDialogProps = {
-  dialog: ConfirmDialogState | null;
+  dialog: ConfirmDialogOptions | null;
   onClose: () => void;
 };
 
@@ -111,15 +101,52 @@ export function ConfirmDialog({ dialog, onClose }: ConfirmDialogProps) {
         <h3 className="modal-title">{dialog.title}</h3>
         <p className="modal-message">{dialog.message}</p>
         <div className="modal-actions">
-          <button type="button" className="modal-btn" onClick={onClose} disabled={isConfirming}>
-            {t("common.cancel")}
-          </button>
+          {!dialog.hideCancel && (
+            <button
+              type="button"
+              className="modal-btn"
+              onClick={onClose}
+              disabled={isConfirming}
+            >
+              {dialog.cancelLabel ?? t("common.cancel")}
+            </button>
+          )}
           <button
             type="button"
             className={dialog.danger ? "modal-btn danger" : "modal-btn primary"}
             onClick={() => void handleConfirm()}
             disabled={isConfirming}
           >
+            {dialog.confirmLabel ?? t("common.ok")}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export type AlertDialogProps = {
+  dialog: AlertDialogOptions | null;
+  onClose: () => void;
+};
+
+export function AlertDialog({ dialog, onClose }: AlertDialogProps) {
+  const { t } = useTranslation();
+
+  if (!dialog) return null;
+
+  return (
+    <div
+      className="modal-backdrop"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div className="modal-card">
+        <h3 className="modal-title">{dialog.title}</h3>
+        <p className="modal-message">{dialog.message}</p>
+        <div className="modal-actions">
+          <button type="button" className="modal-btn primary" onClick={onClose}>
             {dialog.confirmLabel ?? t("common.ok")}
           </button>
         </div>

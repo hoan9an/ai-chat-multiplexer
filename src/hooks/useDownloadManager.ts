@@ -84,7 +84,7 @@ export function useDownloadManager() {
               : [...prev, newToast];
           });
         } else if (payload.kind === "cancelled") {
-          // Người dùng huỷ — không cần toast.
+          // User cancelled — no toast needed.
         }
       },
     );

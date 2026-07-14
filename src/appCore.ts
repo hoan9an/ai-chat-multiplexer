@@ -65,17 +65,19 @@ export const LEGACY_STATE_V4_KEY = "ai-chat-multiplexer-state-v4";
 export const LEGACY_STATE_V3_KEY = "ai-chat-multiplexer-state-v3";
 export const LEGACY_LAYOUT_KEY = "ai-chat-multiplexer-layout-v2";
 export const THEME_STORAGE_KEY = "ai-chat-multiplexer-theme";
-export const DEFAULT_URL = "https://search.brave.com/";
 export const DEFAULT_PROFILE_ID = "prof-default";
 export const APP_VERSION = "0.1.10";
 export const GITHUB_REPO = "hoan9an/ai-chat-multiplexer";
-export const WEBSITE_URL = "https://hoan9an.github.io/ai-chat-multiplexer/";
 export const RELEASES_URL = `https://github.com/${GITHUB_REPO}/releases/latest`;
 
-import { isNewTabUrl, NEW_TAB_TITLE } from "./newtab";
+import { getNewTabUrl, isNewTabUrl, NEW_TAB_ICON, NEW_TAB_TITLE } from "./newtab";
 
 export function createId(prefix: string) {
-  return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return `${prefix}-${crypto.randomUUID()}`;
+  }
+
+  return `${prefix}-${Math.random().toString(16).slice(2)}${Math.random().toString(16).slice(2)}`;
 }
 
 export function compareVersions(a: string, b: string): number {
@@ -99,6 +101,7 @@ export function createDefaultProfiles(): Profile[] {
 export function createDefaultWorkspace(name = "Workspace 1"): Workspace {
   const paneId = createId("pane");
   const tabId = createId("tab");
+  const newTabUrl = getNewTabUrl();
 
   return {
     id: createId("ws"),
@@ -110,7 +113,16 @@ export function createDefaultWorkspace(name = "Workspace 1"): Workspace {
         title: "Main Chat",
         profileId: DEFAULT_PROFILE_ID,
         activeTabId: tabId,
-        tabs: [{ id: tabId, title: "Brave", url: DEFAULT_URL, loadedUrl: DEFAULT_URL }],
+        tabs: [
+          {
+            id: tabId,
+            title: NEW_TAB_TITLE,
+            url: newTabUrl,
+            loadedUrl: newTabUrl,
+            currentUrl: newTabUrl,
+            faviconUrl: NEW_TAB_ICON,
+          },
+        ],
       },
     ],
   };
@@ -162,7 +174,20 @@ export function isTauriRuntime() {
   return "__TAURI_INTERNALS__" in window;
 }
 
+export function isAllowedWebviewUrl(url: string) {
+  if (url === "about:blank") return true;
+
+  try {
+    const parsed = new URL(normalizeUrl(url), window.location.href);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 export function getOriginFallbackIcon(url: string) {
+  // New-tab pages use the bundled app icon instead of an origin favicon.
+  if (isNewTabUrl(url)) return NEW_TAB_ICON;
   try {
     const parsed = new URL(normalizeUrl(url));
     return `${parsed.origin}/favicon.ico`;
@@ -334,14 +359,36 @@ export function normalizeAppState(parsed: AppState): AppState | null {
       : createDefaultProfiles();
 
   const profileIds = new Set(profiles.map((p) => p.id));
+
+  // Reject structurally broken data (a pane with no tabs cannot render) but
+  // cheaply repair what we can: a missing/dangling profileId falls back to the
+  // default profile, and an activeTabId that no longer exists falls back to the
+  // first tab. Bail out entirely if any pane is unrepairable.
+  let structurallyBroken = false;
   const workspaces = parsed.workspaces.map((ws) => ({
     ...ws,
-    panes: ws.panes.map((pane) => ({
-      ...pane,
-      profileId: profileIds.has(pane.profileId) ? pane.profileId : DEFAULT_PROFILE_ID,
-      tabs: hydrateTabs(pane.tabs ?? []),
-    })),
+    panes: (ws.panes ?? []).map((pane) => {
+      const tabs = hydrateTabs(pane.tabs ?? []);
+      if (tabs.length === 0) {
+        structurallyBroken = true;
+      }
+      const activeTabId = tabs.some((tab) => tab.id === pane.activeTabId)
+        ? pane.activeTabId
+        : tabs[0]?.id;
+
+      return {
+        ...pane,
+        profileId: profileIds.has(pane.profileId) ? pane.profileId : DEFAULT_PROFILE_ID,
+        activeTabId,
+        tabs,
+      };
+    }),
   }));
+
+  if (structurallyBroken || workspaces.some((ws) => ws.panes.length === 0)) {
+    return null;
+  }
+
   const activeId = workspaces.some((ws) => ws.id === parsed.activeWorkspaceId)
     ? parsed.activeWorkspaceId
     : workspaces[0].id;

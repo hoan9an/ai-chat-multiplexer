@@ -11,6 +11,7 @@ export const vi = {
   "common.save": "Lưu",
   "common.ok": "OK",
   "common.delete": "Xóa",
+  "common.notice": "Thông báo",
 
   // Settings modal
   "settings.title": "Settings",
@@ -24,7 +25,6 @@ export const vi = {
   "settings.langChinese": "中文",
   "settings.updates": "Cập nhật",
   "settings.currentVersion": "Phiên bản hiện tại",
-  "settings.website": "Website",
   "settings.backupRestore": "Backup & khôi phục",
 
   // Updates

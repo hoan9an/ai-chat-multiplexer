@@ -23,6 +23,8 @@ function defaultProps(overrides: Partial<AppOverlaysProps> = {}): AppOverlaysPro
     submitTextPrompt: vi.fn(),
     confirmDialog: null,
     setConfirmDialog: vi.fn(),
+    alertDialog: null,
+    setAlertDialog: vi.fn(),
     isSettingsOpen: false,
     setIsSettingsOpen: vi.fn(),
     theme: "light",
@@ -84,6 +86,16 @@ describe("AppOverlays", () => {
     expect(screen.getByText("X?")).toBeDefined();
     fireEvent.click(screen.getByRole("button", { name: "Hủy" }));
     expect(props.setConfirmDialog).toHaveBeenCalledWith(null);
+  });
+
+  it("renders AlertDialog when alertDialog is set and routes onClose to setAlertDialog(null)", () => {
+    const props = defaultProps({
+      alertDialog: { title: "Lỗi", message: "Không thể khôi phục" },
+    });
+    render(<AppOverlays {...props} />);
+    expect(screen.getByText("Lỗi")).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: "OK" }));
+    expect(props.setAlertDialog).toHaveBeenCalledWith(null);
   });
 
   it("renders SettingsModal when isSettingsOpen and routes close to setIsSettingsOpen(false)", () => {

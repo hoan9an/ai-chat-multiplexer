@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- Mark JS as available ASAP so reveal-on-scroll can hide content.
+       Without this (JS off/blocked), all content stays visible. -->
+  <script>document.documentElement.className += ' js';</script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Multiplexer — One Workspace. Every AI Conversation.</title>
+  <meta name="description" content="A local-first desktop command center for running Claude, ChatGPT, Gemini, DeepSeek, Perplexity, and Grok side by side with isolated profiles. Built with Tauri 2 + React 19." />
+  <meta name="theme-color" content="#0e0c08" />
+
+  <!-- Inter font (matches app) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" type="image/png" href="assets/app-icon.png" />
+</head>
+<body>
+
+  <!-- ============================================
+       REUSABLE SVG SYMBOLS (no emoji)
+       ============================================ -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <!-- App Logo gradient (faithful recreation of src/Icons.tsx) -->
+      <linearGradient id="g-logo" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+        <stop offset="0%" stop-color="#f5d06f" />
+        <stop offset="55%" stop-color="#d4a017" />
+        <stop offset="100%" stop-color="#a47411" />
+      </linearGradient>
+      <linearGradient id="g-logo-shine" x1="0" y1="0" x2="0" y2="24" gradientUnits="userSpaceOnUse">
+        <stop offset="0%" stop-color="#ffffff" stop-opacity="0.55" />
+        <stop offset="60%" stop-color="#ffffff" stop-opacity="0" />
+      </linearGradient>
+
+      <!-- Stroke-based icons -->
+      <symbol id="i-grid" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" />
+      </symbol>
+      <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><path d="M9 12l2 2 4-4" />
+      </symbol>
+      <symbol id="i-tabs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 8h18v12H3z" /><path d="M3 8l3-4h5l1 4" /><path d="M12 8l2-4h5l1 4" opacity="0.5" />
+      </symbol>
+      <symbol id="i-window" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 9h18" /><circle cx="6.5" cy="6.5" r="0.5" fill="currentColor" /><circle cx="9" cy="6.5" r="0.5" fill="currentColor" />
+      </symbol>
+      <symbol id="i-database" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <ellipse cx="12" cy="5" rx="9" ry="3" /><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5" /><path d="M3 12c0 1.66 4.03 3 9 3s9-1.34 9-3" />
+      </symbol>
+      <symbol id="i-archive" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="4" width="18" height="4" rx="1" /><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8" /><path d="M10 12h4" />
+      </symbol>
+      <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
+      </symbol>
+      <symbol id="i-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></symbol>
+      <symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="9" /><polyline points="12 7 12 12 15 14" />
+      </symbol>
+      <symbol id="i-hd" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="2" y="6" width="20" height="12" rx="2" /><text x="12" y="15.5" font-size="7" font-weight="800" text-anchor="middle" fill="currentColor" stroke="none" font-family="Inter, sans-serif">HD</text>
+      </symbol>
+      <symbol id="i-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="6 9 12 15 18 9" />
+      </symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+      </symbol>
+      <symbol id="i-github" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+      </symbol>
+      <symbol id="i-layers" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <polygon points="12 2 22 8.5 12 15 2 8.5 12 2" /><polyline points="2 15.5 12 22 22 15.5" />
+      </symbol>
+      <symbol id="i-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
+      </symbol>
+      <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+      </symbol>
+      <symbol id="i-clock-fast" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="9" /><polyline points="12 7 12 12 14 14" />
+      </symbol>
+      <symbol id="i-folder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+      </symbol>
+      <symbol id="i-globe" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="9" /><path d="M3 12h18" /><path d="M12 3c2.5 2.7 3.75 5.7 3.75 9S14.5 18.3 12 21c-2.5-2.7-3.75-5.7-3.75-9S9.5 5.7 12 3z" />
+      </symbol>
+      <!-- Layout column icons -->
+      <symbol id="i-col1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="6" y="4" width="12" height="16" rx="1.5" /></symbol>
+      <symbol id="i-col2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="4" y="4" width="7" height="16" rx="1.5" /><rect x="13" y="4" width="7" height="16" rx="1.5" /></symbol>
+      <symbol id="i-col3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="4" width="5.5" height="16" rx="1.5" /><rect x="9.25" y="4" width="5.5" height="16" rx="1.5" /><rect x="15.5" y="4" width="5.5" height="16" rx="1.5" /></symbol>
+      <symbol id="i-col4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="2.5" y="4" width="4" height="16" rx="1.5" /><rect x="7.5" y="4" width="4" height="16" rx="1.5" /><rect x="12.5" y="4" width="4" height="16" rx="1.5" /><rect x="17.5" y="4" width="4" height="16" rx="1.5" /></symbol>
+      <symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
+      </symbol>
+    </defs>
+  </svg>
+
+  <!-- ============================================
+       NAVBAR
+       ============================================ -->
+  <nav class="navbar">
+    <div class="container">
+      <a href="#" class="brand">
+        <svg class="brand-logo" viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="0" y="0" width="24" height="24" rx="6" fill="url(#g-logo)" />
+          <rect x="0" y="0" width="24" height="24" rx="6" fill="url(#g-logo-shine)" />
+          <rect x="5" y="5" width="6" height="6" rx="1.4" fill="#1a1408" fill-opacity="0.85" />
+          <rect x="13" y="5" width="6" height="6" rx="1.4" fill="#1a1408" fill-opacity="0.35" />
+          <rect x="5" y="13" width="6" height="6" rx="1.4" fill="#1a1408" fill-opacity="0.35" />
+          <rect x="13" y="13" width="6" height="6" rx="1.4" fill="#1a1408" fill-opacity="0.85" />
+        </svg>
+        <span class="brand-name"><b>AI</b> Multiplexer</span>
+      </a>
+
+      <div class="nav-links" id="navLinks">
+        <a href="#features">Features</a>
+        <a href="#demo">Demo</a>
+        <a href="#preview">Preview</a>
+        <a href="#how">How it works</a>
+        <a href="#faq">FAQ</a>
+        <a href="https://github.com/hoan9an/ai-chat-multiplexer" target="_blank" rel="noopener">GitHub</a>
+      </div>
+
+      <div class="nav-cta">
+        <a href="#download" class="btn btn-primary">
+          <svg class="icon"><use href="#i-download"/></svg>
+          <span>Download</span>
+        </a>
+        <button class="nav-toggle" id="navToggle" aria-label="Menu">
+          <svg><use href="#i-menu"/></svg>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ============================================
+       HERO
+       ============================================ -->
+  <section class="hero" id="hero">
+    <div class="hero-glow top"></div>
+    <div class="hero-glow bottom"></div>
+    <!-- Abstract multiplexer shapes -->
+    <div class="hero-shape shape-1"></div>
+    <div class="hero-shape shape-2"></div>
+    <div class="hero-shape shape-3"></div>
+    <div class="hero-shape shape-4"></div>
+    <!-- Noise grain overlay -->
+    <div class="hero-grain"></div>
+    <div class="container">
+      <div class="hero-badge">
+        <span class="dot"></span>
+        v0.1.10 · Open Source · MIT License
+      </div>
+
+      <h1>
+        One workspace.
+        <span class="line-2"><span class="text-gradient">Every AI conversation.</span></span>
+      </h1>
+
+      <p class="hero-subtitle">
+        A local-first desktop command center for comparing, coordinating, and keeping
+        multiple AI chats alive side by side. No more tab hunting. No more logging in
+        and out. No more losing context while one model is still thinking.
+      </p>
+
+      <div class="hero-actions">
+        <!-- Windows native -->
+        <a href="https://github.com/hoan9an/ai-chat-multiplexer/releases/latest" target="_blank" rel="noopener" class="btn btn-primary btn-lg" data-os="win">
+          <svg class="icon"><use href="#i-download"/></svg>
+          Download for Windows
+        </a>
+        <!-- macOS — coming soon -->
+        <span class="btn btn-primary btn-lg btn-macos" data-os="mac">
+          <svg class="icon"><use href="#i-download"/></svg>
+          Download for macOS
+        </span>
+        <a href="#demo" class="btn btn-secondary btn-lg" data-os="any">
+          <svg class="icon"><use href="#i-play"/></svg>
+          Watch the Demo
+        </a>
+        <a href="https://github.com/hoan9an/ai-chat-multiplexer" target="_blank" rel="noopener" class="btn btn-ghost btn-lg" data-os="any">
+          <svg class="icon"><use href="#i-github"/></svg>
+          Star on GitHub
+        </a>
+      </div>
+
+      <div class="hero-visual reveal">
+        <img
+          src="assets/hero-screenshot.png"
+          alt="AI Multiplexer desktop app with multiple AI chat panes in a 4-column layout"
+          loading="eager"
+        />
+
+        <!-- Floating badges -->
+        <div class="float-badge badge-top-right">
+          <div class="fb-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></div>
+          <div>
+            <strong>6 AI models</strong>
+            <span>Side by side</span>
+          </div>
+        </div>
+
+        <div class="float-badge badge-bottom-left">
+          <div class="fb-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></div>
+          <div>
+            <strong>1-click install</strong>
+            <span>.exe or .msi</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="hero-stats reveal">
+        <div class="hero-stat">
+          <div class="num"><span class="text-gradient">6</span></div>
+          <div class="label">AI services prelinked</div>
+        </div>
+        <div class="hero-stat">
+          <div class="num"><span class="text-gradient">4</span><span style="font-size:1rem;color:var(--text-muted)"> cols</span></div>
+          <div class="label">Layout modes</div>
+        </div>
+        <div class="hero-stat">
+          <div class="num"><span class="text-gradient">100%</span></div>
+          <div class="label">Local-first</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================
+       FEATURES
+       ============================================ -->
+  <section class="section section-alt" id="features">
+    <div class="container">
+      <div class="section-head reveal">
+        <span class="section-tag">Features</span>
+        <h2>Built for the way <span class="text-gradient">AI power users</span> work</h2>
+        <p>Modern AI work is rarely one-chat-at-a-time. AI Multiplexer gives you a terminal-multiplexer style workspace — without the tab chaos.</p>
+      </div>
+
+      <div class="features-grid">
+        <div class="feature-card reveal">
+          <div class="feature-icon"><svg><use href="#i-grid"/></svg></div>
+          <h3>Multi-pane AI workspace</h3>
+          <p>Split one desktop window into focused panes. Use Focus, 2-column, 3-column, or 4-column layouts, then drag panes into the order that matches your workflow.</p>
+          <div class="feature-detail">Layouts: Focus · 2 · 3 · 4 columns</div>
+        </div>
+
+        <div class="feature-card reveal">
+          <div class="feature-icon"><svg><use href="#i-shield"/></svg></div>
+          <h3>Profile-based session isolation</h3>
+          <p>Profiles are real browser-session containers. Each profile has its own cookies, storage, cache, and login session — isolated on disk per profile, so accounts stay signed in without leaking into each other.</p>
+          <div class="feature-detail">Per-profile <code>data_directory</code> on disk</div>
+        </div>
+
+        <div class="feature-card reveal">
+          <div class="feature-icon"><svg><use href="#i-tabs"/></svg></div>
+          <h3>Tabs inside every pane</h3>
+          <p>Each pane holds multiple tabs with their own URL, title, favicon, and loading state. Reorder tabs, move tabs between panes that share a profile, or detach a tab into a new pane.</p>
+          <div class="feature-detail">Cross-pane drag requires matching profile</div>
+        </div>
+
+        <div class="feature-card reveal">
+          <div class="feature-icon"><svg><use href="#i-window"/></svg></div>
+          <h3>Native webviews, not fragile iframes</h3>
+          <p>Many AI services block iframe embedding with CSP or X-Frame-Options. AI Multiplexer uses native Tauri child webviews, so those sites run like normal desktop browser surfaces.</p>
+          <div class="feature-detail">Webviews keyed by tab — preserved across drags</div>
+        </div>
+
+        <div class="feature-card reveal">
+          <div class="feature-icon"><svg><use href="#i-database"/></svg></div>
+          <h3>Local-first state</h3>
+          <p>Your workspaces, panes, tabs, profiles, theme, and layout are stored locally in <code>localStorage</code>. The app is a desktop shell for the services you choose — not a hosted proxy for your chats.</p>
+          <div class="feature-detail">Debounced 500ms writes · flush on unload</div>
+        </div>
+
+        <div class="feature-card reveal">
+          <div class="feature-icon"><svg><use href="#i-archive"/></svg></div>
+          <h3>Backup, restore &amp; auto-update</h3>
+          <p>Export/import config as JSON, or create a full ZIP backup including profile session files. The desktop app checks GitHub releases and installs signed updates through the Tauri updater.</p>
+          <div class="feature-detail">Full ZIP backup is desktop-only</div>
+        </div>
+      </div>
+
+      <!-- Supported services (from public/newtab.html) -->
+      <div class="services-strip reveal">
+        <div class="label">Prelinked on the New Tab page · Default start: New Tab</div>
+        <div class="service-badge"><img src="https://www.google.com/s2/favicons?domain=chatgpt.com&sz=32" width="20" height="20" alt="" class="svc-icon" /> ChatGPT</div>
+        <div class="service-badge"><img src="https://www.google.com/s2/favicons?domain=claude.ai&sz=32" width="20" height="20" alt="" class="svc-icon" /> Claude</div>
+        <div class="service-badge"><img src="https://www.google.com/s2/favicons?domain=gemini.google.com&sz=32" width="20" height="20" alt="" class="svc-icon" /> Gemini</div>
+        <div class="service-badge"><img src="https://www.google.com/s2/favicons?domain=chat.deepseek.com&sz=32" width="20" height="20" alt="" class="svc-icon" /> DeepSeek</div>
+        <div class="service-badge"><img src="https://www.google.com/s2/favicons?domain=perplexity.ai&sz=32" width="20" height="20" alt="" class="svc-icon" /> Perplexity</div>
+        <div class="service-badge"><img src="https://www.google.com/s2/favicons?domain=grok.com&sz=32" width="20" height="20" alt="" class="svc-icon" /> Grok</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================
+       DEMO VIDEO (placeholder — add iframe later)
+       ============================================ -->
+  <section class="section" id="demo">
+    <div class="container">
+      <div class="section-head reveal">
+        <span class="section-tag">Demo</span>
+        <h2>See AI Multiplexer <span class="text-gradient">in action</span></h2>
+        <p>Watch how multiple AI chats run side by side with isolated profiles and seamless switching.</p>
+      </div>
+
+      <!--
+        VIDEO PLACEHOLDER — to add your demo:
+        1. Loom:    <iframe src="https://www.loom.com/embed/ID" ...>
+        2. YouTube: <iframe src="https://www.youtube-nocookie.com/embed/ID" ...>
+        Replace the .placeholder div below with the iframe, keep the .demo-frame wrapper.
+      -->
+      <div class="demo-frame reveal">
+        <div class="placeholder">
+          <button class="play-btn" aria-label="Play demo" id="playBtn">
+            <svg><use href="#i-play"/></svg>
+          </button>
+          <h3>Demo coming soon</h3>
+          <p class="subtitle">See how you can build a multi-pane AI workspace from scratch</p>
+          <div class="demo-meta">
+            <span><svg><use href="#i-clock"/></svg> ~2 min</span>
+            <span><svg><use href="#i-hd"/></svg> HD</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="demo-points reveal">
+        <div class="demo-point"><span class="arrow">→</span> Open Claude, ChatGPT, and Gemini side by side and ask the same question</div>
+        <div class="demo-point"><span class="arrow">→</span> Switch between isolated profiles — each keeps its own login session</div>
+        <div class="demo-point"><span class="arrow">→</span> Drag tabs between panes that share a profile, or detach into a new pane</div>
+        <div class="demo-point"><span class="arrow">→</span> Back up and restore your entire workspace as a ZIP or JSON</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================
+       INTERACTIVE LIVE PREVIEW
+       ============================================ -->
+  <section class="section section-alt" id="preview">
+    <div class="container">
+      <div class="section-head reveal">
+        <span class="section-tag">Live Preview</span>
+        <h2>Try the <span class="text-gradient">workspace</span> right here</h2>
+        <p>This is a faithful mockup of the app's pane layout. Click the layout buttons to switch between Focus, 2, 3, and 4 columns — exactly like the desktop app.</p>
+      </div>
+
+      <div class="mockup reveal">
+        <div class="mockup-bar">
+          <div class="mockup-dots">
+            <span class="mockup-dot red"></span>
+            <span class="mockup-dot yellow"></span>
+            <span class="mockup-dot green"></span>
+          </div>
+          <span class="mockup-title">AI Multiplexer — Workspace 1 · 4 panes</span>
+          <div class="mockup-toolbar-right">
+            <button class="layout-btn" data-layout="1"><svg><use href="#i-col1"/></svg> Focus</button>
+            <button class="layout-btn" data-layout="2"><svg><use href="#i-col2"/></svg> 2</button>
+            <button class="layout-btn" data-layout="3"><svg><use href="#i-col3"/></svg> 3</button>
+            <button class="layout-btn active" data-layout="4"><svg><use href="#i-col4"/></svg> 4</button>
+          </div>
+        </div>
+
+        <div class="mockup-grid cols-4" id="mockupGrid">
+          <!-- Pane 1 — Claude (indigo accent) -->
+          <div class="pane accent-0">
+            <div class="pane-head">
+              <div class="pane-tab active">
+                <img src="https://www.google.com/s2/favicons?domain=claude.ai&sz=24" width="14" height="14" alt="" class="tab-fav" />
+                <span class="label">Project X</span>
+              </div>
+              <div class="pane-tab add"><svg style="width:12px;height:12px"><use href="#i-plus"/></svg></div>
+            </div>
+            <div class="pane-urlbar">
+              <span class="profile-chip">@Default</span>
+              <span class="url">claude.ai/chat</span>
+              <span class="status"><span class="live"></span> Ready</span>
+            </div>
+            <div class="pane-body">
+              <div class="bubble user">Explain the architecture of a multiplexer for AI chats, like tmux but for browser AI tools</div>
+              <div class="bubble ai">A multi-pane workspace would manage native webviews, each with isolated sessions, mapped to panes via requestAnimationFrame…</div>
+              <div class="bubble user">How does profile isolation work across panes?</div>
+              <div class="bubble typing">
+                <span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>
+              </div>
+            </div>
+          <div class="pane-input">
+            <span class="input-field">Ask Claude a follow-up…</span>
+            <span class="send-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
+          </div>
+        </div>
+
+        <!-- Pane 2 — ChatGPT (blue accent) -->
+          <div class="pane accent-1">
+            <div class="pane-head">
+              <div class="pane-tab active">
+                <img src="https://www.google.com/s2/favicons?domain=chatgpt.com&sz=24" width="14" height="14" alt="" class="tab-fav" />
+                <span class="label">Research</span>
+              </div>
+              <div class="pane-tab add"><svg style="width:12px;height:12px"><use href="#i-plus"/></svg></div>
+            </div>
+            <div class="pane-urlbar">
+              <span class="profile-chip">@Work</span>
+              <span class="url">chatgpt.com/?model=gpt-5</span>
+              <span class="status"><span class="live"></span> Ready</span>
+            </div>
+            <div class="pane-body">
+              <div class="bubble user">Same question: explain an AI multiplexer</div>
+              <div class="bubble ai">Think of it as tmux for browser-based AI. You'd need a pane manager, webview containers per pane, session isolation via profiles, and a persistence layer.</div>
+            <div class="bubble user">Different angle than Claude — useful to compare.</div>
+          </div>
+          <div class="pane-input">
+            <span class="input-field">Type a message…</span>
+            <span class="send-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
+          </div>
+        </div>
+
+        <!-- Pane 3 — Gemini (green accent) -->
+          <div class="pane accent-2">
+            <div class="pane-head">
+              <div class="pane-tab active">
+                <img src="https://www.google.com/s2/favicons?domain=gemini.google.com&sz=24" width="14" height="14" alt="" class="tab-fav" />
+                <span class="label">Deep research</span>
+              </div>
+              <div class="pane-tab add"><svg style="width:12px;height:12px"><use href="#i-plus"/></svg></div>
+            </div>
+            <div class="pane-urlbar">
+              <span class="profile-chip">@Lab</span>
+              <span class="url">gemini.google.com/app</span>
+              <span class="status"><span class="live"></span> Ready</span>
+            </div>
+            <div class="pane-body">
+              <div class="bubble user">Technical comparison of multi-pane architectures for AI</div>
+            <div class="bubble ai">Native webviews outperform iframe approaches for sites sending X-Frame-Options: DENY or strict CSP frame-ancestors.</div>
+          </div>
+          <div class="pane-input">
+            <span class="input-field">Ask Gemini about architectures…</span>
+            <span class="send-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
+          </div>
+        </div>
+
+        <!-- Pane 4 — Perplexity (orange accent) -->
+          <div class="pane accent-3">
+            <div class="pane-head">
+              <div class="pane-tab active">
+                <img src="https://www.google.com/s2/favicons?domain=perplexity.ai&sz=24" width="14" height="14" alt="" class="tab-fav" />
+                <span class="label">Web search</span>
+              </div>
+              <div class="pane-tab add"><svg style="width:12px;height:12px"><use href="#i-plus"/></svg></div>
+            </div>
+            <div class="pane-urlbar">
+              <span class="profile-chip">@Default</span>
+              <span class="url">perplexity.ai/search</span>
+              <span class="status"><span class="live"></span> Ready</span>
+            </div>
+            <div class="pane-body">
+              <div class="bubble user">Latest open-source AI multiplexer tools</div>
+            <div class="bubble ai">According to recent sources, AI Multiplexer by @hoan9an is a Tauri 2 + React 19 desktop shell for running multiple AI chats with isolated profiles…</div>
+          </div>
+          <div class="pane-input">
+            <span class="input-field">Search for more tools…</span>
+            <span class="send-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
+          </div>
+        </div>
+      </div>
+        <p style="text-align:center;margin-top:1.5rem;font-size:0.82rem;color:var(--text-muted)" class="reveal">
+          Profiles shown are user-named examples. The app starts with a single <code style="color:var(--accent)">Default</code> profile — you create more with any name.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================
+       HOW IT WORKS
+       ============================================ -->
+  <section class="section" id="how">
+    <div class="container">
+      <div class="section-head reveal">
+        <span class="section-tag">Quick start</span>
+        <h2>From download to <span class="text-gradient">multi-pane</span> in minutes</h2>
+      </div>
+
+      <div class="steps">
+        <div class="step reveal">
+          <div class="step-num">01</div>
+          <h3>Download &amp; install</h3>
+          <p>Grab the Windows installer from GitHub Releases. Requires Microsoft Edge WebView2 Runtime, already present on Windows 10/11.</p>
+          <div class="step-detail">.exe · .msi</div>
+        </div>
+
+        <div class="step reveal">
+          <div class="step-num">02</div>
+          <h3>Create profiles</h3>
+          <p>The app starts with a single <code>Default</code> profile. Create more with any name — each gets its own isolated session directory on disk.</p>
+          <div class="step-detail">e.g. Work, Personal</div>
+        </div>
+
+        <div class="step reveal">
+          <div class="step-num">03</div>
+          <h3>Open AI chats</h3>
+          <p>Add panes, pick a layout (Focus / 2 / 3 / 4), and load any AI service from the New Tab page or paste any URL.</p>
+          <div class="step-detail">6 services prelinked</div>
+        </div>
+
+        <div class="step reveal">
+          <div class="step-num">04</div>
+          <h3>Compare &amp; persist</h3>
+          <p>Ask the same question across models, keep research visible, and your full workspace survives app restarts.</p>
+          <div class="step-detail">localStorage · debounced</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================
+       WORKFLOWS
+       ============================================ -->
+  <section class="section section-alt" id="workflows">
+    <div class="container">
+      <div class="section-head reveal">
+        <span class="section-tag">Workflows</span>
+        <h2>How AI power users <span class="text-gradient">use it</span></h2>
+      </div>
+
+      <div class="workflows reveal">
+        <div class="workflow-row">
+          <div class="workflow-label"><svg><use href="#i-layers"/></svg> Model comparison</div>
+          <div class="workflow-desc">Open Claude, ChatGPT, Gemini, and Perplexity side by side and ask the same question. Compare responses in real time.</div>
+        </div>
+        <div class="workflow-row">
+          <div class="workflow-label"><svg><use href="#i-search"/></svg> Research + drafting</div>
+          <div class="workflow-desc">Keep a research pane (Perplexity / Gemini) visible while another AI writes, edits, or summarizes in an adjacent pane.</div>
+        </div>
+        <div class="workflow-row">
+          <div class="workflow-label"><svg><use href="#i-users"/></svg> Account separation</div>
+          <div class="workflow-desc">Use profiles with separate login sessions — all visible simultaneously in different panes, with no account conflicts.</div>
+        </div>
+        <div class="workflow-row">
+          <div class="workflow-label"><svg><use href="#i-clock-fast"/></svg> Long-running prompts</div>
+          <div class="workflow-desc">Let one model think while you continue working in another pane. No more waiting or losing your place.</div>
+        </div>
+        <div class="workflow-row">
+          <div class="workflow-label"><svg><use href="#i-folder"/></svg> Project context</div>
+          <div class="workflow-desc">Keep dedicated workspaces for clients, repos, topics, or experiments. Switch entire contexts without closing anything.</div>
+        </div>
+        <div class="workflow-row">
+          <div class="workflow-label"><svg><use href="#i-globe"/></svg> Local tooling</div>
+          <div class="workflow-desc">Open localhost apps, docs, dashboards, or local AI tools beside hosted AI chats — any http/https URL works.</div>
+        </div>
+      </div>
+
+      <div style="text-align:center;margin-top:3rem" class="reveal">
+        <!-- secondary CTA — show all platforms -->
+        <a href="https://github.com/hoan9an/ai-chat-multiplexer/releases/latest" target="_blank" rel="noopener" class="btn btn-primary btn-lg" data-os="win">
+          <svg class="icon"><use href="#i-download"/></svg>
+          Download for Windows — free &amp; open source
+        </a>
+        <span class="btn btn-outline btn-lg btn-macos" data-os="mac">
+          <svg class="icon"><use href="#i-download"/></svg>
+          macOS — coming soon
+        </span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================
+       TECH STACK
+       ============================================ -->
+  <section class="section" id="tech">
+    <div class="container">
+      <div class="section-head reveal">
+        <span class="section-tag">Tech stack</span>
+        <h2>Compact, <span class="text-gradient">modern</span>, open</h2>
+        <p>No Electron bloat. Built on Tauri 2 with a small Rust backend and a React 19 frontend.</p>
+      </div>
+
+      <div class="tech-badges reveal">
+        <span class="tech-badge">Tauri 2</span>
+        <span class="tech-badge">React 19</span>
+        <span class="tech-badge">TypeScript</span>
+        <span class="tech-badge">Vite 7</span>
+        <span class="tech-badge">Rust</span>
+        <span class="tech-badge">Plain CSS</span>
+        <span class="tech-badge">Vitest</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================
+       CTA / DOWNLOAD
+       ============================================ -->
+  <section class="cta" id="download">
+    <div class="container">
+      <div class="reveal">
+        <span class="section-tag">Get started</span>
+        <h2>Ready to <span class="text-gradient">supercharge</span> your AI workflow?</h2>
+        <p>Free, open source, local-first. No signup required.</p>
+
+        <div class="cta-actions">
+          <!-- Windows — real download -->
+          <a href="https://github.com/hoan9an/ai-chat-multiplexer/releases/latest" target="_blank" rel="noopener" class="btn btn-primary btn-lg">
+            <svg class="icon"><use href="#i-download"/></svg>
+            Download for Windows
+          </a>
+          <!-- macOS — coming soon -->
+          <span class="btn btn-outline btn-lg btn-macos">
+            <svg class="icon"><use href="#i-download"/></svg>
+          Download for macOS
+        </span>
+        <a href="https://github.com/hoan9an/ai-chat-multiplexer" target="_blank" rel="noopener" class="btn btn-ghost btn-lg">
+          <svg class="icon"><use href="#i-github"/></svg>
+          Source on GitHub
+          </a>
+        </div>
+
+        <div class="cta-meta">
+          <span>Version <strong>0.1.10</strong></span>
+          <span class="sep">·</span>
+          <a href="https://github.com/hoan9an/ai-chat-multiplexer#quick-start" target="_blank" rel="noopener">Run from source</a>
+          <span class="sep">·</span>
+          <a href="https://github.com/hoan9an/ai-chat-multiplexer/releases" target="_blank" rel="noopener">All releases</a>
+          <span class="sep">·</span>
+          <span>MIT License</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================
+       FAQ
+       ============================================ -->
+  <section class="section section-alt" id="faq">
+    <div class="container">
+      <div class="section-head reveal">
+        <span class="section-tag">FAQ</span>
+        <h2>Frequently asked <span class="text-gradient">questions</span></h2>
+      </div>
+
+      <div class="faq-list reveal">
+        <div class="faq-item active">
+          <button class="faq-q">
+            What is AI Multiplexer?
+            <svg class="faq-icon"><use href="#i-chevron"/></svg>
+          </button>
+          <div class="faq-answer"><div class="faq-answer-inner">
+            A local-first desktop application that runs multiple AI chat services side by side in a single window, using native Tauri webviews with per-profile session isolation. The only built-in profile is <strong>Default</strong> — you create additional profiles with any name you like.
+          </div></div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-q">
+            Why not just use browser tabs?
+            <svg class="faq-icon"><use href="#i-chevron"/></svg>
+          </button>
+          <div class="faq-answer"><div class="faq-answer-inner">
+            Browser tabs get noisy and fragile. AI Multiplexer gives you persistent workspaces that survive restarts, profile isolation so accounts don't conflict, native webviews that handle X-Frame-Options and strict CSP, and a focused shell without browser chrome.
+          </div></div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-q">
+            Which AI services are supported?
+            <svg class="faq-icon"><use href="#i-chevron"/></svg>
+          </button>
+          <div class="faq-answer"><div class="faq-answer-inner">
+            The New Tab page prelinks <strong>ChatGPT, Claude, Gemini, DeepSeek, Perplexity, and Grok</strong>. But since it's a general browser shell, any <code>http</code>/<code>https</code> URL works — including localhost tools, docs, and dashboards.
+          </div></div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-q">
+            Does it work on macOS or Linux?
+            <svg class="faq-icon"><use href="#i-chevron"/></svg>
+          </button>
+          <div class="faq-answer"><div class="faq-answer-inner">
+            Currently built for Windows. The project uses Tauri 2, which supports cross-platform builds; macOS and Linux support can be added with community contributions. You can also run the web dev build, though many AI sites block iframe rendering.
+          </div></div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-q">
+            Is my chat data sent anywhere?
+            <svg class="faq-icon"><use href="#i-chevron"/></svg>
+          </button>
+          <div class="faq-answer"><div class="faq-answer-inner">
+            No. The app is local-first: workspace state lives in <code>localStorage</code>, and your chats connect directly to the AI service websites you open — never through a proxy. The only other outbound connections are to GitHub, to check for and download signed updates. It never proxies, caches, decrypts, or bypasses cookies, tokens, or site protections.
+          </div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================
+       FOOTER
+       ============================================ -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <a href="#" class="brand">
+            <svg class="brand-logo" viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="0" y="0" width="24" height="24" rx="6" fill="url(#g-logo)" />
+              <rect x="0" y="0" width="24" height="24" rx="6" fill="url(#g-logo-shine)" />
+              <rect x="5" y="5" width="6" height="6" rx="1.4" fill="#1a1408" fill-opacity="0.85" />
+              <rect x="13" y="5" width="6" height="6" rx="1.4" fill="#1a1408" fill-opacity="0.35" />
+              <rect x="5" y="13" width="6" height="6" rx="1.4" fill="#1a1408" fill-opacity="0.35" />
+              <rect x="13" y="13" width="6" height="6" rx="1.4" fill="#1a1408" fill-opacity="0.85" />
+            </svg>
+            <span class="brand-name"><b>AI</b> Multiplexer</span>
+          </a>
+          <p>A local-first desktop command center for comparing, coordinating, and keeping multiple AI chats alive side by side.</p>
+        </div>
+
+        <div class="footer-col">
+          <h4>Product</h4>
+          <a href="#features">Features</a>
+          <a href="#demo">Demo</a>
+          <a href="#preview">Live Preview</a>
+          <a href="#download">Download</a>
+        </div>
+
+        <div class="footer-col">
+          <h4>Community</h4>
+          <a href="https://github.com/hoan9an/ai-chat-multiplexer" target="_blank" rel="noopener">GitHub</a>
+          <a href="https://github.com/hoan9an/ai-chat-multiplexer/releases" target="_blank" rel="noopener">Releases</a>
+          <a href="https://github.com/hoan9an/ai-chat-multiplexer/issues" target="_blank" rel="noopener">Issues</a>
+          <a href="https://github.com/hoan9an/ai-chat-multiplexer/discussions" target="_blank" rel="noopener">Discussions</a>
+        </div>
+
+        <div class="footer-col">
+          <h4>Legal</h4>
+          <a href="https://github.com/hoan9an/ai-chat-multiplexer/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a>
+          <a href="https://github.com/hoan9an/ai-chat-multiplexer/blob/main/README.md" target="_blank" rel="noopener">Documentation</a>
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        <span>© 2025 AI Multiplexer · Made by An · MIT License</span>
+        <div class="footer-social">
+          <a href="https://github.com/hoan9an/ai-chat-multiplexer" target="_blank" rel="noopener" aria-label="GitHub">
+            <svg><use href="#i-github"/></svg>
+          </a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+
+  <!-- Back to top -->
+  <button class="back-to-top" id="backToTop" aria-label="Back to top">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="18 15 12 9 6 15"/>
+    </svg>
+  </button>
+
+</body>
+</html>

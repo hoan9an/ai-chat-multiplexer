@@ -4,8 +4,14 @@ import type { MutableRefObject } from "react";
 
 import { Pane, type PaneProps } from "./components/Pane";
 import type { ChatPane } from "./appCore";
+import { getNewTabUrl } from "./newtab";
+import { LANG_STORAGE_KEY, LanguageProvider, type Lang } from "./i18n";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  window.localStorage.removeItem(LANG_STORAGE_KEY);
+  delete (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__;
+});
 
 function makePane(overrides: Partial<ChatPane> = {}): ChatPane {
   return {
@@ -21,7 +27,7 @@ function makePane(overrides: Partial<ChatPane> = {}): ChatPane {
   };
 }
 
-function renderHarness(overrides: Partial<PaneProps> = {}) {
+function renderHarness(overrides: Partial<PaneProps> = {}, options: { lang?: Lang } = {}) {
   const paneDragRef = { current: null } as PaneProps["paneDrag"];
   const tabDragRef = { current: null } as PaneProps["tabDrag"];
   const pane = (overrides.pane as ChatPane) ?? makePane();
@@ -59,7 +65,17 @@ function renderHarness(overrides: Partial<PaneProps> = {}) {
     detachTabToNewPane: vi.fn(),
     ...overrides,
   };
-  const utils = render(<Pane {...props} />);
+  if (options.lang) {
+    window.localStorage.setItem(LANG_STORAGE_KEY, options.lang);
+  }
+  const ui = options.lang ? (
+    <LanguageProvider>
+      <Pane {...props} />
+    </LanguageProvider>
+  ) : (
+    <Pane {...props} />
+  );
+  const utils = render(ui);
   return { ...utils, props };
 }
 
@@ -187,6 +203,21 @@ describe("Pane", () => {
     expect(props.commitTabUrl).toHaveBeenCalledWith("p1", "t1");
   });
 
+  it("Escape cancels URL editing without committing (no navigation)", () => {
+    // Regression: Escape used to drop the draft then blur(), but blur fires onBlur
+    // synchronously and commitTabUrl read the stale draft, committing the half-typed
+    // URL. The cancel flag must make the blur skip the commit entirely.
+    const { container, props } = renderHarness({
+      editingUrls: { "p1:t1": "https://half-typed" },
+    });
+    const input = container.querySelector<HTMLInputElement>(".url-input")!;
+    input.focus();
+    fireEvent.keyDown(input, { key: "Escape" });
+    // Draft must be cleared and the synchronous blur() from Escape must NOT commit.
+    expect(props.setEditingUrls).toHaveBeenCalled();
+    expect(props.commitTabUrl).not.toHaveBeenCalled();
+  });
+
   it("URL input shows editing override from editingUrls when present", () => {
     const { container } = renderHarness({
       editingUrls: { "p1:t1": "https://draft.test" },
@@ -231,5 +262,113 @@ describe("Pane", () => {
     const favicon = container.querySelector<HTMLImageElement>(".tab-favicon");
     expect(favicon).not.toBeNull();
     expect(favicon!.src).toContain("favicon.ico");
+  });
+
+  it("passes the active language to the new-tab iframe URL", () => {
+    const newTabUrl = getNewTabUrl();
+    const pane = makePane({
+      tabs: [
+        {
+          id: "t1",
+          title: "New Tab",
+          url: newTabUrl,
+          loadedUrl: newTabUrl,
+          currentUrl: newTabUrl,
+        },
+      ],
+      activeTabId: "t1",
+    });
+
+    const { container } = renderHarness({ pane }, { lang: "en" });
+    const frame = container.querySelector<HTMLIFrameElement>(".chat-frame")!;
+
+    expect(frame.src).toContain("/newtab.html");
+    expect(new URL(frame.src).searchParams.get("lang")).toBe("en");
+  });
+
+  it("uses a loading placeholder instead of iframe-loading external URLs in Tauri", () => {
+    (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ = {};
+    const pane = makePane({
+      tabs: [
+        {
+          id: "t1",
+          title: "Claude",
+          url: "https://claude.ai",
+          loadedUrl: "https://claude.ai",
+          currentUrl: "https://claude.ai",
+          isLoading: true,
+        },
+      ],
+      activeTabId: "t1",
+    });
+
+    const { container } = renderHarness({ pane });
+    const frame = container.querySelector<HTMLIFrameElement>(".chat-frame")!;
+
+    expect(frame.src).toBe("about:blank");
+    expect(frame.className).toContain("chat-frame-hidden");
+    expect(container.querySelector(".webview-loading")).not.toBeNull();
+  });
+
+  it("navigates the active new-tab iframe through app state messages", () => {
+    const newTabUrl = getNewTabUrl();
+    const pane = makePane({
+      tabs: [
+        {
+          id: "t1",
+          title: "New Tab",
+          url: newTabUrl,
+          loadedUrl: newTabUrl,
+          currentUrl: newTabUrl,
+        },
+      ],
+      activeTabId: "t1",
+    });
+    const updateActivePane = vi.fn();
+    const { container } = renderHarness({ pane, updateActivePane });
+    const frame = container.querySelector<HTMLIFrameElement>(".chat-frame")!;
+
+    window.dispatchEvent(
+      new MessageEvent("message", {
+        origin: window.location.origin,
+        source: frame.contentWindow,
+        data: { type: "ai-chat-multiplexer:navigate", url: "https://claude.ai" },
+      }),
+    );
+
+    expect(updateActivePane).toHaveBeenCalledWith("p1", expect.any(Function));
+    const updater = updateActivePane.mock.calls[0][1] as (current: ChatPane) => ChatPane;
+    const updated = updater(pane);
+    expect(updated.tabs[0]).toMatchObject({
+      title: "claude.ai",
+      url: "https://claude.ai",
+      loadedUrl: "https://claude.ai",
+      currentUrl: "https://claude.ai",
+      faviconUrl: "https://claude.ai/favicon.ico",
+      isLoading: true,
+    });
+  });
+
+  it("ignores new-tab navigation messages from a different origin", () => {
+    const newTabUrl = getNewTabUrl();
+    const pane = makePane({
+      tabs: [
+        { id: "t1", title: "New Tab", url: newTabUrl, loadedUrl: newTabUrl },
+      ],
+      activeTabId: "t1",
+    });
+    const updateActivePane = vi.fn();
+    const { container } = renderHarness({ pane, updateActivePane });
+    const frame = container.querySelector<HTMLIFrameElement>(".chat-frame")!;
+
+    window.dispatchEvent(
+      new MessageEvent("message", {
+        origin: "https://evil.example",
+        source: frame.contentWindow,
+        data: { type: "ai-chat-multiplexer:navigate", url: "https://claude.ai" },
+      }),
+    );
+
+    expect(updateActivePane).not.toHaveBeenCalled();
   });
 });

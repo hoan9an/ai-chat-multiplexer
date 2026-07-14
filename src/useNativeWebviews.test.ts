@@ -142,7 +142,7 @@ describe("useNativeWebviews", () => {
     });
   });
 
-  it("adds the active language to new-tab native webview URLs", () => {
+  it("does not upsert the local new-tab page into native webviews", () => {
     const newTabUrl = getNewTabUrl();
     const state = makeState(
       [makeWorkspace("ws1", [makePane("p1", "prof-default", [makeTab("t1", newTabUrl)])])],
@@ -150,10 +150,21 @@ describe("useNativeWebviews", () => {
     );
     setupHookWithShells(state, null, false, ["p1"], "zh");
 
-    const upsert = calls("native_webview_upsert")[0]?.[1] as
-      | { request: { url: string } }
-      | undefined;
-    expect(upsert?.request.url).toBe(new URL("/newtab.html?lang=zh", window.location.href).toString());
+    expect(calls("native_webview_upsert")).toHaveLength(0);
+    const hides = calls("native_webview_hide").map((c) => (c[1] as { label: string }).label);
+    expect(hides).toContain("tab-t1");
+  });
+
+  it("does not upsert blocked URL schemes into native webviews", () => {
+    const state = makeState(
+      [makeWorkspace("ws1", [makePane("p1", "prof-default", [makeTab("t1", "javascript:alert(1)")])])],
+      "ws1",
+    );
+    setupHookWithShells(state, null, false, ["p1"]);
+
+    expect(calls("native_webview_upsert")).toHaveLength(0);
+    const hides = calls("native_webview_hide").map((c) => (c[1] as { label: string }).label);
+    expect(hides).toContain("tab-t1");
   });
 
   it("hides tabs that are not the pane's activeTab", () => {

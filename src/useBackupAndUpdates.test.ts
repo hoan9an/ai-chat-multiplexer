@@ -97,6 +97,7 @@ interface SetupResult {
   setStateSpy: ReturnType<typeof vi.fn>;
   setFocusedPaneId: ReturnType<typeof vi.fn>;
   setConfirmDialog: ReturnType<typeof vi.fn>;
+  setAlertDialog: ReturnType<typeof vi.fn>;
 }
 
 function setupHook(initial?: AppState): SetupResult {
@@ -104,16 +105,18 @@ function setupHook(initial?: AppState): SetupResult {
   const setStateSpy = vi.fn();
   const setFocusedPaneId = vi.fn();
   const setConfirmDialog = vi.fn();
+  const setAlertDialog = vi.fn();
   const { result } = renderHook(() =>
     useBackupAndUpdates({
       state,
       setState: setStateSpy,
       setFocusedPaneId,
       setConfirmDialog,
+      setAlertDialog,
     }),
   );
   invokeSpy.mockClear();
-  return { state, result, setStateSpy, setFocusedPaneId, setConfirmDialog };
+  return { state, result, setStateSpy, setFocusedPaneId, setConfirmDialog, setAlertDialog };
 }
 
 describe("backup/restore product wording", () => {
@@ -241,15 +244,15 @@ describe("useBackupAndUpdates", () => {
           warnings: [],
         },
       ]);
-      const alertSpy = vi.spyOn(window, "alert");
-
-      const { result, setStateSpy, setFocusedPaneId } = setupHook();
+      const { result, setStateSpy, setFocusedPaneId, setAlertDialog } = setupHook();
 
       expect(result.current.startupRestoreProcessing).toBe(true);
       await waitFor(() => expect(setStateSpy).toHaveBeenCalledWith(expect.objectContaining({ activeWorkspaceId: "ws-restored" })));
       await waitFor(() => expect(result.current.startupRestoreProcessing).toBe(false));
       expect(setFocusedPaneId).toHaveBeenCalledWith(null);
-      expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining("Restore hoàn tất"));
+      expect(setAlertDialog).toHaveBeenCalledWith(
+        expect.objectContaining({ message: expect.stringContaining("Restore hoàn tất") }),
+      );
     });
 
     it("does not replace state when restored config is invalid", async () => {
@@ -264,13 +267,13 @@ describe("useBackupAndUpdates", () => {
           warnings: ["warning text"],
         },
       ]);
-      const alertSpy = vi.spyOn(window, "alert");
-
-      const { result, setStateSpy } = setupHook();
+      const { result, setStateSpy, setAlertDialog } = setupHook();
 
       await waitFor(() => expect(result.current.startupRestoreProcessing).toBe(false));
       expect(setStateSpy).not.toHaveBeenCalled();
-      expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining("warning text"));
+      expect(setAlertDialog).toHaveBeenCalledWith(
+        expect.objectContaining({ message: expect.stringContaining("warning text") }),
+      );
     });
   });
 
@@ -635,15 +638,14 @@ describe("useBackupAndUpdates", () => {
       dialogSave.mockResolvedValue("C:/cfg.json");
       rejectingCommands.add("plugin:fs|write_text_file");
       writeTextFileSpy.mockRejectedValue(new Error("disk full"));
-      const alertSpy = vi.spyOn(window, "alert");
-      const { result } = setupHook();
+      const { result, setAlertDialog } = setupHook();
       await act(async () => {
         await result.current.exportConfigJson();
       });
-      expect(alertSpy).toHaveBeenCalledTimes(1);
-      const alertMsg = nthCallFirstArgString(alertSpy);
-      expect(alertMsg).toMatch(/Export lỗi/);
-      expect(alertMsg).toMatch(/disk full/);
+      expect(setAlertDialog).toHaveBeenCalledTimes(1);
+      const alertArg = setAlertDialog.mock.calls[0][0];
+      expect(alertArg.message).toMatch(/Export lỗi/);
+      expect(alertArg.message).toMatch(/disk full/);
       expect(result.current.backupBusy).toBe("idle");
     });
 
@@ -652,12 +654,13 @@ describe("useBackupAndUpdates", () => {
       writeTextFileExportNull = true;
       dialogSave.mockResolvedValue("C:/cfg.json");
       rejectingCommands.add("plugin:fs|write_text_file");
-      const alertSpy = vi.spyOn(window, "alert");
-      const { result } = setupHook();
+      const { result, setAlertDialog } = setupHook();
       await act(async () => {
         await result.current.exportConfigJson();
       });
-      expectCallWithMessage(alertSpy, /không khả dụng/);
+      expect(setAlertDialog).toHaveBeenCalledWith(
+        expect.objectContaining({ message: expect.stringMatching(/không khả dụng/) }),
+      );
       expect(writeTextFileSpy).not.toHaveBeenCalled();
       expect(result.current.backupBusy).toBe("idle");
     });
@@ -734,37 +737,38 @@ describe("useBackupAndUpdates", () => {
 
     it("alerts on invalid JSON without calling setConfirmDialog", async () => {
       mockFileInput("{ not json");
-      const alertSpy = vi.spyOn(window, "alert");
-      const { result, setConfirmDialog } = setupHook();
+      const { result, setConfirmDialog, setAlertDialog } = setupHook();
 
       await act(async () => {
         await result.current.importConfigJson();
       });
 
-      await waitFor(() => expect(alertSpy).toHaveBeenCalledTimes(1));
-      expectCallWithMessage(alertSpy, /Import lỗi/);
+      await waitFor(() => expect(setAlertDialog).toHaveBeenCalledTimes(1));
+      expect(setAlertDialog).toHaveBeenCalledWith(
+        expect.objectContaining({ message: expect.stringMatching(/Import lỗi/) }),
+      );
       expect(setConfirmDialog).not.toHaveBeenCalled();
       expect(result.current.backupBusy).toBe("idle");
     });
 
     it("alerts when file lacks workspaces array", async () => {
       mockFileInput(JSON.stringify({ workspaces: [], profiles: [] }));
-      const alertSpy = vi.spyOn(window, "alert");
-      const { result, setConfirmDialog } = setupHook();
+      const { result, setConfirmDialog, setAlertDialog } = setupHook();
 
       await act(async () => {
         await result.current.importConfigJson();
       });
 
-      await waitFor(() => expect(alertSpy).toHaveBeenCalledTimes(1));
-      expectCallWithMessage(alertSpy, /không có workspaces|workspaces|hợp lệ|lỗi/i);
+      await waitFor(() => expect(setAlertDialog).toHaveBeenCalledTimes(1));
+      expect(setAlertDialog).toHaveBeenCalledWith(
+        expect.objectContaining({ message: expect.stringMatching(/không có workspaces|workspaces|hợp lệ|lỗi/i) }),
+      );
       expect(setConfirmDialog).not.toHaveBeenCalled();
     });
 
     it("returns idle when user cancels the file picker (no file selected)", async () => {
       mockFileInput(null);
-      const { result, setConfirmDialog } = setupHook();
-      const alertSpy = vi.spyOn(window, "alert");
+      const { result, setConfirmDialog, setAlertDialog } = setupHook();
 
       await act(async () => {
         await result.current.importConfigJson();
@@ -773,7 +777,7 @@ describe("useBackupAndUpdates", () => {
       // The "no file" path resolves with null which makes text empty,
       // so importConfigJson returns to idle without confirm dialog or alert.
       expect(setConfirmDialog).not.toHaveBeenCalled();
-      expect(alertSpy).not.toHaveBeenCalled();
+      expect(setAlertDialog).not.toHaveBeenCalled();
       expect(result.current.backupBusy).toBe("idle");
     });
   });
@@ -839,16 +843,15 @@ describe("useBackupAndUpdates", () => {
     it("alerts when readTextFile rejects (outer try/catch)", async () => {
       dialogOpen.mockResolvedValue("C:/tmp/config.json");
       readTextFileSpy.mockRejectedValue(new Error("read failed"));
-      const alertSpy = vi.spyOn(window, "alert");
-      const { result, setConfirmDialog } = setupHook();
+      const { result, setConfirmDialog, setAlertDialog } = setupHook();
       await act(async () => {
         await result.current.importConfigJson();
       });
       expect(setConfirmDialog).not.toHaveBeenCalled();
-      expect(alertSpy).toHaveBeenCalledTimes(1);
-      const alertMsg = nthCallFirstArgString(alertSpy);
-      expect(alertMsg).toMatch(/Import lỗi/);
-      expect(alertMsg).toMatch(/read failed/);
+      expect(setAlertDialog).toHaveBeenCalledTimes(1);
+      const alertArg = setAlertDialog.mock.calls[0][0];
+      expect(alertArg.message).toMatch(/Import lỗi/);
+      expect(alertArg.message).toMatch(/read failed/);
       expect(result.current.backupBusy).toBe("idle");
     });
 
@@ -856,13 +859,14 @@ describe("useBackupAndUpdates", () => {
       // BRDA gap: line 167 `if (!readTextFile) throw ...` — true branch.
       dialogOpen.mockResolvedValue("C:/tmp/config.json");
       readTextFileExportNull = true;
-      const alertSpy = vi.spyOn(window, "alert");
-      const { result, setConfirmDialog } = setupHook();
+      const { result, setConfirmDialog, setAlertDialog } = setupHook();
       await act(async () => {
         await result.current.importConfigJson();
       });
       expect(setConfirmDialog).not.toHaveBeenCalled();
-      expectCallWithMessage(alertSpy, /không khả dụng/);
+      expect(setAlertDialog).toHaveBeenCalledWith(
+        expect.objectContaining({ message: expect.stringMatching(/không khả dụng/) }),
+      );
       expect(readTextFileSpy).not.toHaveBeenCalled();
       expect(result.current.backupBusy).toBe("idle");
     });
@@ -870,27 +874,29 @@ describe("useBackupAndUpdates", () => {
 
   describe("desktop-only guards", () => {
     it("exportFullBackup alerts and returns when not in Tauri runtime", async () => {
-      const alertSpy = vi.spyOn(window, "alert");
-      const { result } = setupHook();
+      const { result, setAlertDialog } = setupHook();
 
       await act(async () => {
         await result.current.exportFullBackup();
       });
 
-      expectCallWithMessage(alertSpy, /desktop|app/i);
+      expect(setAlertDialog).toHaveBeenCalledWith(
+        expect.objectContaining({ message: expect.stringMatching(/desktop|app/i) }),
+      );
       expect(invokeSpy).not.toHaveBeenCalled();
       expect(result.current.backupBusy).toBe("idle");
     });
 
     it("restoreFullBackup alerts and returns when not in Tauri runtime", async () => {
-      const alertSpy = vi.spyOn(window, "alert");
-      const { result } = setupHook();
+      const { result, setAlertDialog } = setupHook();
 
       await act(async () => {
         await result.current.restoreFullBackup();
       });
 
-      expectCallWithMessage(alertSpy, /desktop|app/i);
+      expect(setAlertDialog).toHaveBeenCalledWith(
+        expect.objectContaining({ message: expect.stringMatching(/desktop|app/i) }),
+      );
       expect(invokeSpy).not.toHaveBeenCalled();
       expect(result.current.backupBusy).toBe("idle");
     });
@@ -903,85 +909,79 @@ describe("useBackupAndUpdates", () => {
       writeTextFileSpy.mockReset();
     });
 
-    it("returns idle without invoking when user cancels save dialog", async () => {
-      dialogSave.mockResolvedValue(null);
-      const { result } = setupHook();
+    it("returns idle without opening confirm when Rust reports cancelled save (null path)", async () => {
+      // Rust mở hộp thoại lưu và trả về null khi người dùng hủy.
+      invokeSpy.mockResolvedValue(null);
+      const { result, setConfirmDialog } = setupHook();
       await act(async () => {
         await result.current.exportFullBackup();
       });
-      expect(invokeSpy).not.toHaveBeenCalledWith("backup_sessions_zip", expect.anything());
+      expect(invokeSpy).toHaveBeenCalledWith("backup_sessions_zip", {
+        configJson: expect.stringContaining("workspaces"),
+      });
+      expect(setConfirmDialog).not.toHaveBeenCalled();
       expect(result.current.backupBusy).toBe("idle");
     });
 
-    it("invokes backup_sessions_zip with config json on success", async () => {
-      dialogSave.mockResolvedValue("C:/tmp/backup.zip");
-      invokeSpy.mockResolvedValue(undefined);
+    it("invokes backup_sessions_zip with config json and confirms with the Rust-chosen path", async () => {
+      // Frontend không còn tự chọn đường dẫn; nó dùng đường dẫn Rust trả về.
+      invokeSpy.mockResolvedValue("C:/tmp/backup.zip");
       const { result, setConfirmDialog } = setupHook();
       await act(async () => {
         await result.current.exportFullBackup();
       });
       expect(writeTextFileSpy).not.toHaveBeenCalled();
+      expect(dialogSave).not.toHaveBeenCalled();
       expect(invokeSpy).toHaveBeenCalledWith("backup_sessions_zip", {
-        outputPath: "C:/tmp/backup.zip",
         configJson: expect.stringContaining("workspaces"),
       });
-      expect(setConfirmDialog).toHaveBeenCalledWith(expect.objectContaining({
-        title: expect.stringContaining("restart"),
-      }));
+      const confirmArg = setConfirmDialog.mock.calls[0][0];
+      expect(confirmArg.message).toContain("C:/tmp/backup.zip");
+      expect(confirmArg.message).toContain("C:/tmp/backup.json");
+      expect(confirmArg.title).toEqual(expect.stringContaining("restart"));
       expect(result.current.backupBusy).toBe("idle");
     });
 
     it("alerts when invoke throws", async () => {
-      dialogSave.mockResolvedValue("C:/tmp/backup.zip");
-      writeTextFileSpy.mockResolvedValue(undefined);
-      invokeSpy.mockRejectedValue(new Error("boom"));
-      const alertSpy = vi.spyOn(window, "alert");
-      const { result } = setupHook();
+      const { result, setAlertDialog } = setupHook();
+      // Đặt sau setupHook để không bị effect mount (session_startup_results) tiêu thụ.
+      invokeSpy.mockRejectedValueOnce(new Error("boom"));
       await act(async () => {
         await result.current.exportFullBackup();
       });
-      expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining("Backup lỗi"));
+      expect(setAlertDialog).toHaveBeenCalledWith(
+        expect.objectContaining({ message: expect.stringContaining("Backup lỗi") }),
+      );
       expect(result.current.backupBusy).toBe("idle");
     });
 
-    it("does not depend on plugin-fs for full backup sidecar config", async () => {
+    it("does not depend on plugin-fs or the JS dialog for full backup", async () => {
       writeTextFileExportNull = true;
-      dialogSave.mockResolvedValue("C:/tmp/backup.zip");
-      invokeSpy.mockResolvedValue(undefined);
+      invokeSpy.mockResolvedValue("C:/tmp/backup.zip");
       const { result, setConfirmDialog } = setupHook();
       await act(async () => {
         await result.current.exportFullBackup();
       });
       expect(writeTextFileSpy).not.toHaveBeenCalled();
+      expect(dialogSave).not.toHaveBeenCalled();
       expect(invokeSpy).toHaveBeenCalledWith("backup_sessions_zip", {
-        outputPath: "C:/tmp/backup.zip",
         configJson: expect.stringContaining("workspaces"),
       });
       expect(setConfirmDialog).toHaveBeenCalledWith(expect.objectContaining({
         title: expect.stringContaining("restart"),
       }));
-      expect(result.current.backupBusy).toBe("idle");
-    });
-
-    it("returns idle without invoking when user cancels save dialog (top-level early return)", async () => {
-      dialogSave.mockResolvedValue(null);
-      const { result } = setupHook();
-      await act(async () => {
-        await result.current.exportFullBackup();
-      });
-      expect(invokeSpy).not.toHaveBeenCalledWith("backup_sessions_zip", expect.anything());
-      expect(writeTextFileSpy).not.toHaveBeenCalled();
       expect(result.current.backupBusy).toBe("idle");
     });
 
     it("alerts when not in Tauri runtime (early return path)", async () => {
       tauriRuntime = false;
-      const alertSpy = vi.spyOn(window, "alert");
-      const { result } = setupHook();
+      const { result, setAlertDialog } = setupHook();
       await act(async () => {
         await result.current.exportFullBackup();
       });
-      expectCallWithMessage(alertSpy, /desktop|app/i);
+      expect(setAlertDialog).toHaveBeenCalledWith(
+        expect.objectContaining({ message: expect.stringMatching(/desktop|app/i) }),
+      );
       expect(invokeSpy).not.toHaveBeenCalled();
     });
   });
@@ -992,19 +992,22 @@ describe("useBackupAndUpdates", () => {
       dialogOpen.mockReset();
     });
 
-    it("returns idle without confirming when user cancels open dialog", async () => {
-      dialogOpen.mockResolvedValue(null);
+    it("opens the danger confirm dialog immediately without touching the JS dialog", async () => {
       const { result, setConfirmDialog } = setupHook();
       await act(async () => {
         await result.current.restoreFullBackup();
       });
-      expect(setConfirmDialog).not.toHaveBeenCalled();
+      expect(dialogOpen).not.toHaveBeenCalled();
+      expect(setConfirmDialog).toHaveBeenCalledTimes(1);
+      expect(setConfirmDialog.mock.calls[0][0]).toEqual(
+        expect.objectContaining({ danger: true }),
+      );
       expect(result.current.backupBusy).toBe("idle");
     });
 
-    it("opens confirm dialog and invokes restore_sessions_zip on confirm", async () => {
-      dialogOpen.mockResolvedValue("C:/tmp/in.zip");
-      invokeSpy.mockResolvedValue(undefined);
+    it("invokes restore_sessions_zip with no path on confirm and shows success on a returned path", async () => {
+      // Rust tự mở hộp thoại chọn file và trả về đường dẫn đã chọn.
+      invokeSpy.mockResolvedValue("C:/tmp/in.zip");
       const { result, setConfirmDialog } = setupHook();
       await act(async () => {
         await result.current.restoreFullBackup();
@@ -1014,23 +1017,35 @@ describe("useBackupAndUpdates", () => {
       await act(async () => {
         await dialogArg.onConfirm();
       });
-      expect(invokeSpy).toHaveBeenCalledWith("restore_sessions_zip", {
-        inputPath: "C:/tmp/in.zip",
-      });
+      expect(invokeSpy).toHaveBeenCalledWith("restore_sessions_zip", undefined);
       expect(setConfirmDialog).toHaveBeenCalledTimes(2);
       const successDialog = setConfirmDialog.mock.calls[1][0];
       expect(successDialog.title).toContain("Restore");
       expect(result.current.backupBusy).toBe("idle");
     });
 
+    it("returns idle without a success dialog when Rust reports cancelled pick (null path)", async () => {
+      invokeSpy.mockResolvedValue(null);
+      const { result, setConfirmDialog } = setupHook();
+      await act(async () => {
+        await result.current.restoreFullBackup();
+      });
+      const dialogArg = setConfirmDialog.mock.calls[0][0];
+      await act(async () => {
+        await dialogArg.onConfirm();
+      });
+      expect(invokeSpy).toHaveBeenCalledWith("restore_sessions_zip", undefined);
+      // Chỉ có dialog xác nhận ban đầu, không có dialog thành công.
+      expect(setConfirmDialog).toHaveBeenCalledTimes(1);
+      expect(result.current.backupBusy).toBe("idle");
+    });
+
     it("keeps backupBusy importing while confirmed restore is running", async () => {
-      dialogOpen.mockResolvedValue("C:/tmp/in.zip");
-      invokeSpy.mockResolvedValueOnce([]);
-      let resolveRestore!: () => void;
+      let resolveRestore!: (value: string | null) => void;
       const { result, setConfirmDialog } = setupHook();
       invokeSpy.mockImplementation((cmd: string) => {
         if (cmd === "restore_sessions_zip") {
-          return new Promise<void>((resolve) => {
+          return new Promise<string | null>((resolve) => {
             resolveRestore = resolve;
           });
         }
@@ -1050,16 +1065,14 @@ describe("useBackupAndUpdates", () => {
       expect(result.current.backupBusy).toBe("importing");
 
       await act(async () => {
-        resolveRestore();
+        resolveRestore("C:/tmp/in.zip");
         await confirmPromise;
       });
       expect(result.current.backupBusy).toBe("idle");
     });
 
     it("dialog onConfirm alerts on invoke error", async () => {
-      dialogOpen.mockResolvedValue("C:/tmp/in.zip");
-      const alertSpy = vi.spyOn(window, "alert");
-      const { result, setConfirmDialog } = setupHook();
+      const { result, setConfirmDialog, setAlertDialog } = setupHook();
       await act(async () => {
         await result.current.restoreFullBackup();
       });
@@ -1068,18 +1081,9 @@ describe("useBackupAndUpdates", () => {
       await act(async () => {
         await dialogArg.onConfirm();
       });
-      expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining("Restore lỗi"));
-    });
-
-    it("alerts when dialog.open itself rejects (outer try/catch)", async () => {
-      dialogOpen.mockRejectedValueOnce(new Error("dialog blocked"));
-      const alertSpy = vi.spyOn(window, "alert");
-      const { result, setConfirmDialog } = setupHook();
-      await act(async () => {
-        await result.current.restoreFullBackup();
-      });
-      expect(setConfirmDialog).not.toHaveBeenCalled();
-      expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining("Restore lỗi"));
+      expect(setAlertDialog).toHaveBeenCalledWith(
+        expect.objectContaining({ message: expect.stringContaining("Restore lỗi") }),
+      );
       expect(result.current.backupBusy).toBe("idle");
     });
   });
@@ -1098,17 +1102,18 @@ describe("useBackupAndUpdates", () => {
     });
 
     it("exportConfigJson with non-Error coerces to String (line 142 false branch)", async () => {
-      const alertSpy = vi.spyOn(window, "alert");
       const original = URL.createObjectURL;
       (URL as unknown as { createObjectURL: () => string }).createObjectURL = () => {
         throw "blob denied"; // non-Error
       };
       try {
-        const { result } = setupHook();
+        const { result, setAlertDialog } = setupHook();
         await act(async () => {
           await result.current.exportConfigJson();
         });
-        expectCallWithMessage(alertSpy, /blob denied/);
+        expect(setAlertDialog).toHaveBeenCalledWith(
+          expect.objectContaining({ message: expect.stringMatching(/blob denied/) }),
+        );
         expect(result.current.backupBusy).toBe("idle");
       } finally {
         (URL as unknown as { createObjectURL: typeof original }).createObjectURL = original;
@@ -1119,44 +1124,32 @@ describe("useBackupAndUpdates", () => {
       tauriRuntime = true;
       dialogOpen.mockResolvedValue("C:/cfg.json");
       readTextFileSpy.mockRejectedValue("read denied" as unknown as Error);
-      const alertSpy = vi.spyOn(window, "alert");
-      const { result } = setupHook();
+      const { result, setAlertDialog } = setupHook();
       await act(async () => {
         await result.current.importConfigJson();
       });
-      expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining("read denied"));
+      expect(setAlertDialog).toHaveBeenCalledWith(
+        expect.objectContaining({ message: expect.stringContaining("read denied") }),
+      );
       expect(result.current.backupBusy).toBe("idle");
     });
 
-    it("exportFullBackup with non-Error rejection coerces to String (line 259 false branch)", async () => {
+    it("exportFullBackup with non-Error rejection coerces to String", async () => {
       tauriRuntime = true;
-      dialogSave.mockRejectedValue("save denied" as unknown as Error);
-      const alertSpy = vi.spyOn(window, "alert");
-      const { result } = setupHook();
+      invokeSpy.mockRejectedValue("save denied" as unknown as Error);
+      const { result, setAlertDialog } = setupHook();
       await act(async () => {
         await result.current.exportFullBackup();
       });
-      expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining("save denied"));
+      expect(setAlertDialog).toHaveBeenCalledWith(
+        expect.objectContaining({ message: expect.stringContaining("save denied") }),
+      );
       expect(result.current.backupBusy).toBe("idle");
     });
 
-    it("restoreFullBackup outer with non-Error rejection coerces to String (line 298 false branch)", async () => {
+    it("restoreFullBackup onConfirm with non-Error rejection coerces to String", async () => {
       tauriRuntime = true;
-      dialogOpen.mockRejectedValueOnce("denied" as unknown as Error);
-      const alertSpy = vi.spyOn(window, "alert");
-      const { result, setConfirmDialog } = setupHook();
-      await act(async () => {
-        await result.current.restoreFullBackup();
-      });
-      expect(setConfirmDialog).not.toHaveBeenCalled();
-      expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining("denied"));
-    });
-
-    it("restoreFullBackup onConfirm with non-Error rejection coerces to String (line 293 false branch)", async () => {
-      tauriRuntime = true;
-      dialogOpen.mockResolvedValue("C:/tmp/in.zip");
-      const alertSpy = vi.spyOn(window, "alert");
-      const { result, setConfirmDialog } = setupHook();
+      const { result, setConfirmDialog, setAlertDialog } = setupHook();
       await act(async () => {
         await result.current.restoreFullBackup();
       });
@@ -1165,7 +1158,9 @@ describe("useBackupAndUpdates", () => {
       await act(async () => {
         await dialogArg.onConfirm();
       });
-      expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining("zip rejected"));
+      expect(setAlertDialog).toHaveBeenCalledWith(
+        expect.objectContaining({ message: expect.stringContaining("zip rejected") }),
+      );
     });
   });
 
@@ -1263,7 +1258,10 @@ describe("useBackupAndUpdates", () => {
       expect(importedPane.profileId).not.toBe("missing-prof");
     });
 
-    it("onConfirm uses [] fallback when pane.tabs is undefined (line 212 false branch)", async () => {
+    it("rejects an imported config whose pane has no tabs (structurally broken)", async () => {
+      // A pane with no tabs is unrenderable. normalizeAppState now returns null
+      // for it, so applyImportedAppState throws invalidConfig and the import is
+      // refused with an alert instead of opening the replace-confirm dialog.
       const incoming = {
         workspaces: [
           {
@@ -1276,7 +1274,7 @@ describe("useBackupAndUpdates", () => {
                 title: "P",
                 profileId: "prof-default",
                 activeTabId: "t",
-                // tabs intentionally omitted → pane.tabs ?? []
+                // tabs intentionally omitted → structurally broken, rejected.
               },
             ],
           },
@@ -1286,17 +1284,14 @@ describe("useBackupAndUpdates", () => {
       };
       dialogOpen.mockResolvedValue("C:/cfg.json");
       readTextFileSpy.mockResolvedValue(JSON.stringify(incoming));
-      const { result, setConfirmDialog, setStateSpy } = setupHook();
+      const { result, setConfirmDialog, setStateSpy, setAlertDialog } = setupHook();
       await act(async () => {
         await result.current.importConfigJson();
       });
-      const dialogArg = setConfirmDialog.mock.calls[0][0];
-      act(() => {
-        dialogArg.onConfirm();
-      });
-      const newState = setStateSpy.mock.calls[0][0];
-      const importedPane = newState.workspaces[0].panes[0];
-      expect(Array.isArray(importedPane.tabs)).toBe(true);
+      // No replace-confirm dialog and no state write: the broken config is refused.
+      expect(setConfirmDialog).not.toHaveBeenCalled();
+      expect(setStateSpy).not.toHaveBeenCalled();
+      expect(setAlertDialog).toHaveBeenCalled();
     });
 
     it("onConfirm picks first workspace as active when activeWorkspaceId is missing (line 215 false branch)", async () => {

@@ -4,27 +4,15 @@ import {
   IconExternal,
   IconMoon,
   IconRefresh,
-  IconSettings as _IconSettings,
   IconSun,
   IconUpload,
   IconX,
 } from "../Icons";
-import { APP_VERSION, GITHUB_REPO, WEBSITE_URL, isTauriRuntime, type ThemeMode } from "../appCore";
+import { APP_VERSION, GITHUB_REPO, isTauriRuntime, type ThemeMode } from "../appCore";
 import { useTranslation, type Lang } from "../i18n";
+import type { UpdateStatus, BackupBusy } from "../types/updates";
 
-void _IconSettings; // re-exported indirectly so the file remains stable on tree-shake
-
-export type UpdateStatus =
-  | { kind: "idle" }
-  | { kind: "checking" }
-  | { kind: "available"; latest: string; releaseUrl: string }
-  | { kind: "downloading"; latest: string; progress: number }
-  | { kind: "installing"; latest: string }
-  | { kind: "readyToInstall"; latest: string }
-  | { kind: "current" }
-  | { kind: "error"; message: string };
-
-export type BackupBusy = "idle" | "exporting" | "importing";
+export type { UpdateStatus, BackupBusy };
 
 export type SettingsModalProps = {
   open: boolean;
@@ -246,17 +234,6 @@ export function SettingsModal({
 
         <footer className="settings-footer">
           <div className="settings-footer-links">
-            <a
-              href={WEBSITE_URL}
-              target="_blank"
-              rel="noreferrer"
-              onClick={(event) => {
-                event.preventDefault();
-                onOpenReleasePage(WEBSITE_URL);
-              }}
-            >
-              {t("settings.website")}
-            </a>
             <a
               href={`https://github.com/${GITHUB_REPO}`}
               target="_blank"

@@ -1,0 +1,56 @@
+name: CI
+
+# Test/lint gate for pull requests and pushes to main. Keeps the frontend
+# type-checked and tested, and the Rust backend compiling and passing its tests
+# before anything merges.
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check
+        run: npx tsc --noEmit
+
+      - name: Test
+        run: npm test
+
+  # Run the Rust job on windows-latest: it matches the app's primary target and
+  # needs no webkit2gtk system-dependency setup (the Linux release job installs
+  # libwebkit2gtk-4.1-dev et al; running on Windows avoids that entirely for CI).
+  backend:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - name: Cargo check
+        run: cargo check --manifest-path src-tauri/Cargo.toml
+
+      - name: Cargo test
+        run: cargo test --manifest-path src-tauri/Cargo.toml

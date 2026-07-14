@@ -1,31 +1,29 @@
 import { useState } from "react";
-import type { ConfirmDialogOptions, TextPromptOptions } from "../types/dialogs";
+import type {
+  AlertDialogOptions,
+  ConfirmDialogOptions,
+  TextPromptOptions,
+  TextPromptState,
+} from "../types/dialogs";
 
 export interface UsePromptDialogsResult {
-  textPrompt: {
-    title: string;
-    initial: string;
-    placeholder?: string;
-    onSubmit: (value: string) => void;
-  } | null;
+  textPrompt: TextPromptState | null;
   textPromptValue: string;
   setTextPromptValue: (value: string) => void;
   confirmDialog: ConfirmDialogOptions | null;
   setConfirmDialog: (dialog: ConfirmDialogOptions | null) => void;
+  alertDialog: AlertDialogOptions | null;
+  setAlertDialog: (dialog: AlertDialogOptions | null) => void;
   openTextPrompt: (opts: TextPromptOptions) => void;
   closeTextPrompt: () => void;
   submitTextPrompt: () => void;
 }
 
 export function usePromptDialogs(): UsePromptDialogsResult {
-  const [textPrompt, setTextPrompt] = useState<{
-    title: string;
-    initial: string;
-    placeholder?: string;
-    onSubmit: (value: string) => void;
-  } | null>(null);
+  const [textPrompt, setTextPrompt] = useState<TextPromptState | null>(null);
   const [textPromptValue, setTextPromptValue] = useState("");
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogOptions | null>(null);
+  const [alertDialog, setAlertDialog] = useState<AlertDialogOptions | null>(null);
 
   function openTextPrompt(opts: TextPromptOptions) {
     setTextPromptValue(opts.initial ?? "");
@@ -59,6 +57,8 @@ export function usePromptDialogs(): UsePromptDialogsResult {
     setTextPromptValue,
     confirmDialog,
     setConfirmDialog,
+    alertDialog,
+    setAlertDialog,
     openTextPrompt,
     closeTextPrompt,
     submitTextPrompt,

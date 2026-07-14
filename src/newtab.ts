@@ -4,6 +4,10 @@
 
 export const NEW_TAB_TITLE = "New Tab";
 
+// Icon shown for new-tab pages (tab strip + page favicon). Served from public/
+// so it resolves on both the dev origin and tauri://localhost in production.
+export const NEW_TAB_ICON = "/app-icon.png";
+
 const NEW_TAB_PATH = "/newtab.html";
 
 export function getNewTabUrl(): string {

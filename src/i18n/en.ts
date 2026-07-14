@@ -7,6 +7,7 @@ export const en: Dictionary = {
   "common.save": "Save",
   "common.ok": "OK",
   "common.delete": "Delete",
+  "common.notice": "Notice",
 
   // Settings modal
   "settings.title": "Settings",
@@ -20,7 +21,6 @@ export const en: Dictionary = {
   "settings.langChinese": "中文",
   "settings.updates": "Updates",
   "settings.currentVersion": "Current version",
-  "settings.website": "Website",
   "settings.backupRestore": "Backup & restore",
 
   // Updates

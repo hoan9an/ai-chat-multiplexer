@@ -11,32 +11,17 @@ import {
   type AppState,
 } from "../appCore";
 import type { Update } from "@tauri-apps/plugin-updater";
+import type { UpdateStatus, BackupBusy } from "../types/updates";
+import type { AlertDialogOptions, ConfirmDialogOptions } from "../types/dialogs";
 
-export type UpdateStatus =
-  | { kind: "idle" }
-  | { kind: "checking" }
-  | { kind: "available"; latest: string; releaseUrl: string }
-  | { kind: "downloading"; latest: string; progress: number }
-  | { kind: "installing"; latest: string }
-  | { kind: "readyToInstall"; latest: string }
-  | { kind: "current" }
-  | { kind: "error"; message: string };
-
-export type BackupBusy = "idle" | "exporting" | "importing";
-
-export interface ConfirmDialogRequest {
-  title: string;
-  message: string;
-  confirmLabel?: string;
-  danger?: boolean;
-  onConfirm: () => void | Promise<void>;
-}
+export type { UpdateStatus, BackupBusy };
 
 export interface UseBackupAndUpdatesArgs {
   state: AppState;
   setState: (next: AppState) => void;
   setFocusedPaneId: (id: string | null) => void;
-  setConfirmDialog: (dialog: ConfirmDialogRequest | null) => void;
+  setConfirmDialog: (dialog: ConfirmDialogOptions | null) => void;
+  setAlertDialog: (dialog: AlertDialogOptions | null) => void;
 }
 
 interface StartupOperationResult {
@@ -85,6 +70,7 @@ export function useBackupAndUpdates({
   setState,
   setFocusedPaneId,
   setConfirmDialog,
+  setAlertDialog,
 }: UseBackupAndUpdatesArgs): UseBackupAndUpdatesResult {
   const { t } = useTranslation();
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>({ kind: "idle" });
@@ -109,6 +95,10 @@ export function useBackupAndUpdates({
       throw new Error(t("backup.invalidConfig"));
     }
     return normalized;
+  }
+
+  function showAlert(message: string, title = t("common.notice")) {
+    setAlertDialog({ title, message, confirmLabel: t("common.ok") });
   }
 
   useLayoutEffect(() => {
@@ -164,7 +154,7 @@ export function useBackupAndUpdates({
         });
 
         if (messages.length > 0) {
-          window.alert(messages.join("\n\n"));
+          showAlert(messages.join("\n\n"));
         }
       })
       .catch((error) => {
@@ -190,7 +180,7 @@ export function useBackupAndUpdates({
       try {
         await invoke("quit_app");
       } catch {
-        window.alert(t("backup.restartManual"));
+        showAlert(t("backup.restartManual"));
       }
     }
   }
@@ -357,7 +347,7 @@ export function useBackupAndUpdates({
         URL.revokeObjectURL(url);
       }
     } catch (error) {
-      window.alert(t("backup.exportError", { msg: error instanceof Error ? error.message : String(error) }));
+      showAlert(t("backup.exportError", { msg: error instanceof Error ? error.message : String(error) }));
     } finally {
       setBackupBusy("idle");
     }
@@ -420,7 +410,7 @@ export function useBackupAndUpdates({
         },
       });
     } catch (error) {
-      window.alert(t("backup.importError", { msg: error instanceof Error ? error.message : String(error) }));
+      showAlert(t("backup.importError", { msg: error instanceof Error ? error.message : String(error) }));
     } finally {
       setBackupBusy("idle");
     }
@@ -428,35 +418,31 @@ export function useBackupAndUpdates({
 
   async function exportFullBackup() {
     if (!isTauriRuntime()) {
-      window.alert(t("backup.fullDesktopOnly"));
+      showAlert(t("backup.fullDesktopOnly"));
       return;
     }
     setBackupBusy("exporting");
     try {
-      const { save } = await import("@tauri-apps/plugin-dialog");
-      const filePath = await save({
-        title: t("backup.saveFullTitle"),
-        defaultPath: `ai-multiplexer-backup-${new Date().toISOString().slice(0, 10)}.zip`,
-        filters: [{ name: "ZIP", extensions: ["zip"] }],
+      // Rust tự mở hộp thoại lưu và trả về đường dẫn đã chọn (hoặc null nếu
+      // người dùng hủy). Không truyền đường dẫn từ frontend: file backup chứa
+      // cookie session sống nên việc chọn đường dẫn phải nằm ở backend.
+      const outputPath = await invoke<string | null>("backup_sessions_zip", {
+        configJson: JSON.stringify(state, null, 2),
       });
-      if (!filePath) {
+      if (!outputPath) {
         setBackupBusy("idle");
         return;
       }
-      const configPath = filePath.replace(/\.zip$/i, ".json");
-      await invoke("backup_sessions_zip", {
-        outputPath: filePath,
-        configJson: JSON.stringify(state, null, 2),
-      });
+      const configPath = outputPath.replace(/\.zip$/i, ".json");
       setConfirmDialog({
         title: t("backup.backupScheduledTitle"),
-        message: t("backup.backupScheduledMsg", { zip: filePath, config: configPath }),
+        message: t("backup.backupScheduledMsg", { zip: outputPath, config: configPath }),
         confirmLabel: t("backup.restartNow"),
         danger: false,
         onConfirm: restartApp,
       });
     } catch (error) {
-      window.alert(
+      showAlert(
         t("backup.backupError", {
           msg: error instanceof Error ? error.message : String(error),
         }),
@@ -468,50 +454,39 @@ export function useBackupAndUpdates({
 
   async function restoreFullBackup() {
     if (!isTauriRuntime()) {
-      window.alert(t("backup.restoreDesktopOnly"));
+      showAlert(t("backup.restoreDesktopOnly"));
       return;
     }
-    setBackupBusy("importing");
-    try {
-      const { open } = await import("@tauri-apps/plugin-dialog");
-      const filePath = await open({
-        title: t("backup.chooseRestoreTitle"),
-        multiple: false,
-        filters: [{ name: "ZIP", extensions: ["zip"] }],
-      });
-      if (!filePath || typeof filePath !== "string") {
-        setBackupBusy("idle");
-        return;
-      }
-
-      setConfirmDialog({
-        title: t("backup.restoreTitle"),
-        message: t("backup.restoreMsg"),
-        confirmLabel: t("backup.restore"),
-        danger: true,
-        onConfirm: async () => {
-          setBackupBusy("importing");
-          try {
-            await invoke("restore_sessions_zip", { inputPath: filePath });
-            setConfirmDialog({
-              title: t("backup.restoreSuccessTitle"),
-              message: t("backup.restoreSuccessMsg"),
-              confirmLabel: t("backup.restartNow"),
-              danger: false,
-              onConfirm: restartApp,
-            });
-          } catch (error) {
-            window.alert(t("backup.restoreError", { msg: error instanceof Error ? error.message : String(error) }));
-          } finally {
-            setBackupBusy("idle");
+    setBackupBusy("idle");
+    // Xác nhận trước khi thao tác vì restore sẽ thay thế session hiện tại. Rust
+    // sẽ tự mở hộp thoại chọn file khi người dùng đồng ý, trả về đường dẫn đã
+    // chọn (hoặc null nếu hủy) — frontend không còn truyền đường dẫn tùy ý.
+    setConfirmDialog({
+      title: t("backup.restoreTitle"),
+      message: t("backup.restoreMsg"),
+      confirmLabel: t("backup.restore"),
+      danger: true,
+      onConfirm: async () => {
+        setBackupBusy("importing");
+        try {
+          const inputPath = await invoke<string | null>("restore_sessions_zip");
+          if (!inputPath) {
+            return;
           }
-        },
-      });
-    } catch (error) {
-      window.alert(t("backup.restoreError", { msg: error instanceof Error ? error.message : String(error) }));
-    } finally {
-      setBackupBusy("idle");
-    }
+          setConfirmDialog({
+            title: t("backup.restoreSuccessTitle"),
+            message: t("backup.restoreSuccessMsg"),
+            confirmLabel: t("backup.restartNow"),
+            danger: false,
+            onConfirm: restartApp,
+          });
+        } catch (error) {
+          showAlert(t("backup.restoreError", { msg: error instanceof Error ? error.message : String(error) }));
+        } finally {
+          setBackupBusy("idle");
+        }
+      },
+    });
   }
 
   return {

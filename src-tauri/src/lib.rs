@@ -88,11 +88,37 @@ struct StartupOperationResult {
     warnings: Vec<String>,
 }
 
-fn parse_webview_url(url: &str) -> Result<WebviewUrl, String> {
-    Ok(WebviewUrl::External(
-        url.parse()
-            .map_err(|error| format!("URL không hợp lệ: {error}"))?,
-    ))
+fn is_safe_webview_label(label: &str) -> bool {
+    // Chỉ chấp nhận nhãn của các pane webview do frontend tạo ra: `tab-{id}`
+    // (xem getNativeWebviewLabel trong appCore.ts). Không cho phép "main" hay bất
+    // kỳ nhãn nào khác để tránh điều hướng/đóng cửa sổ chính có đặc quyền.
+    // Khớp ^tab-[A-Za-z0-9_-]+$ và giới hạn 128 ký tự.
+    label.len() <= 128
+        && label.len() > "tab-".len()
+        && label.starts_with("tab-")
+        && label.chars().all(|character| {
+            character.is_ascii_alphanumeric() || character == '-' || character == '_'
+        })
+}
+
+fn validate_webview_label(label: &str) -> Result<(), String> {
+    if is_safe_webview_label(label) {
+        Ok(())
+    } else {
+        Err("Nhãn webview không hợp lệ".to_string())
+    }
+}
+
+fn validate_webview_url(url: &str) -> Result<url::Url, String> {
+    if url == "about:blank" {
+        return url::Url::parse(url).map_err(|error| format!("URL không hợp lệ: {error}"));
+    }
+
+    let parsed = url::Url::parse(url).map_err(|error| format!("URL không hợp lệ: {error}"))?;
+    match parsed.scheme() {
+        "http" | "https" => Ok(parsed),
+        _ => Err("Chỉ cho phép URL http/https cho native webview".to_string()),
+    }
 }
 
 fn sanitize_path_part(value: &str) -> String {
@@ -181,6 +207,9 @@ async fn native_webview_upsert(
         height,
     } = request;
 
+    validate_webview_label(&label)?;
+    let parsed_url = validate_webview_url(&url)?;
+
     if width < 1.0 || height < 1.0 {
         return Ok(());
     }
@@ -202,7 +231,7 @@ async fn native_webview_upsert(
     let session_dir = profile_session_directory(&app, &profile_id)?;
     let download_app = app.clone();
     let download_label = label.clone();
-    let webview_builder = WebviewBuilder::new(&label, parse_webview_url(&url)?)
+    let webview_builder = WebviewBuilder::new(&label, WebviewUrl::External(parsed_url))
         .data_directory(session_dir)
         .enable_clipboard_access()
         .on_download(move |_webview, event| match event {
@@ -354,6 +383,7 @@ async fn delete_profile_session(app: tauri::AppHandle, profile_id: String) -> Re
 
 #[tauri::command]
 async fn native_webview_hide(app: tauri::AppHandle, label: String) -> Result<(), String> {
+    validate_webview_label(&label)?;
     if let Some(webview) = app.get_webview(&label) {
         webview.hide().map_err(|error| error.to_string())?;
     }
@@ -363,6 +393,7 @@ async fn native_webview_hide(app: tauri::AppHandle, label: String) -> Result<(),
 
 #[tauri::command]
 async fn native_webview_close(app: tauri::AppHandle, label: String) -> Result<(), String> {
+    validate_webview_label(&label)?;
     if let Some(webview) = app.get_webview(&label) {
         webview.close().map_err(|error| error.to_string())?;
     }
@@ -376,6 +407,7 @@ async fn native_webview_navigate(
     label: String,
     action: String,
 ) -> Result<(), String> {
+    validate_webview_label(&label)?;
     let webview = app
         .get_webview(&label)
         .ok_or_else(|| "Không tìm thấy webview đang mở".to_string())?;
@@ -397,12 +429,11 @@ async fn native_webview_load_url(
     label: String,
     url: String,
 ) -> Result<(), String> {
+    validate_webview_label(&label)?;
     let webview = app
         .get_webview(&label)
         .ok_or_else(|| "Không tìm thấy webview đang mở".to_string())?;
-    let parsed: url::Url = url
-        .parse()
-        .map_err(|error| format!("URL không hợp lệ: {error}"))?;
+    let parsed = validate_webview_url(&url)?;
     webview
         .navigate(parsed)
         .map_err(|error| error.to_string())?;
@@ -414,6 +445,7 @@ async fn native_webview_tab_status(
     app: tauri::AppHandle,
     label: String,
 ) -> Result<NativeTabStatus, String> {
+    validate_webview_label(&label)?;
     let webview = app
         .get_webview(&label)
         .ok_or_else(|| "Không tìm thấy webview đang mở".to_string())?;
@@ -456,8 +488,32 @@ async fn native_webview_tab_status(
         });
 
     status.url = current_url;
+    sanitize_native_tab_status(&mut status);
 
     Ok(status)
+}
+
+/// Làm sạch tiêu đề/favicon do trang (không tin cậy) trả về trước khi đưa lên
+/// cửa sổ chính có đặc quyền: loại ký tự điều khiển khỏi title, giới hạn độ dài,
+/// và chỉ giữ favicon là URL http/https.
+fn sanitize_native_tab_status(status: &mut NativeTabStatus) {
+    const MAX_TITLE_LEN: usize = 512;
+    const MAX_FAVICON_LEN: usize = 2048;
+
+    status.title = status
+        .title
+        .chars()
+        .filter(|character| !character.is_control())
+        .take(MAX_TITLE_LEN)
+        .collect();
+
+    let favicon_ok = status.favicon_url.len() <= MAX_FAVICON_LEN
+        && url::Url::parse(&status.favicon_url)
+            .map(|parsed| matches!(parsed.scheme(), "http" | "https"))
+            .unwrap_or(false);
+    if !favicon_ok {
+        status.favicon_url = String::new();
+    }
 }
 
 fn pane_sessions_root(app: &tauri::AppHandle) -> Result<PathBuf, String> {
@@ -531,6 +587,28 @@ fn add_dir_to_zip<W: Write + std::io::Seek>(
     }
 
     Ok(file_count)
+}
+
+/// Ngày UTC hiện tại dạng `YYYY-MM-DD`, dùng cho tên file backup mặc định gợi ý
+/// trong hộp thoại lưu (tương đương `new Date().toISOString().slice(0, 10)` ở
+/// frontend cũ). Tự tính để không cần thêm dependency về thời gian.
+fn today_utc_yyyy_mm_dd() -> String {
+    let secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_secs() as i64)
+        .unwrap_or(0);
+    // Thuật toán civil_from_days của Howard Hinnant.
+    let z = secs.div_euclid(86_400) + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z - era * 146_097; // [0, 146096]
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365; // [0, 399]
+    let year = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100); // [0, 365]
+    let mp = (5 * doy + 2) / 153; // [0, 11]
+    let day = doy - (153 * mp + 2) / 5 + 1; // [1, 31]
+    let month = if mp < 10 { mp + 3 } else { mp - 9 }; // [1, 12]
+    let year = if month <= 2 { year + 1 } else { year };
+    format!("{year:04}-{month:02}-{day:02}")
 }
 
 fn config_sidecar_path(output_path: &Path) -> PathBuf {
@@ -1063,11 +1141,34 @@ fn apply_staged_sessions_restore(root: &Path) -> Result<(), String> {
 #[tauri::command]
 async fn backup_sessions_zip(
     app: tauri::AppHandle,
-    output_path: String,
     config_json: String,
-) -> Result<(), String> {
+) -> Result<Option<String>, String> {
+    // Bảo mật: file backup chứa cookie session sống của mọi tài khoản đang đăng
+    // nhập, nên Rust tự mở hộp thoại lưu thay vì nhận đường dẫn tùy ý từ frontend
+    // (frontend bị chiếm quyền có thể exfiltrate cookie ra đường dẫn bất kỳ).
+    // Dùng blocking_save_file trên luồng riêng để không chặn luồng chính.
+    let default_name = format!("ai-multiplexer-backup-{}.zip", today_utc_yyyy_mm_dd());
+    let dialog_app = app.clone();
+    let chosen = tauri::async_runtime::spawn_blocking(move || {
+        dialog_app
+            .dialog()
+            .file()
+            .set_title("Lưu full backup")
+            .set_file_name(&default_name)
+            .add_filter("ZIP", &["zip"])
+            .blocking_save_file()
+    })
+    .await
+    .map_err(|error| error.to_string())?;
+
+    let output_path = match chosen {
+        Some(file_path) => file_path.into_path().map_err(|error| error.to_string())?,
+        None => return Ok(None),
+    };
+
     let root = pane_sessions_root(&app)?;
-    schedule_sessions_backup(&root, Path::new(&output_path), config_json)
+    schedule_sessions_backup(&root, &output_path, config_json)?;
+    Ok(Some(output_path.to_string_lossy().into_owned()))
 }
 
 #[tauri::command]
@@ -1085,9 +1186,30 @@ async fn session_startup_results(
 }
 
 #[tauri::command]
-async fn restore_sessions_zip(app: tauri::AppHandle, input_path: String) -> Result<(), String> {
+async fn restore_sessions_zip(app: tauri::AppHandle) -> Result<Option<String>, String> {
+    // Bảo mật: Rust tự mở hộp thoại chọn file thay vì nhận đường dẫn tùy ý từ
+    // frontend, tránh việc cấy dữ liệu session từ đường dẫn bất kỳ.
+    // blocking_pick_file chạy trên luồng riêng để không chặn luồng chính.
+    let dialog_app = app.clone();
+    let chosen = tauri::async_runtime::spawn_blocking(move || {
+        dialog_app
+            .dialog()
+            .file()
+            .set_title("Chọn file backup .zip (sessions)")
+            .add_filter("ZIP", &["zip"])
+            .blocking_pick_file()
+    })
+    .await
+    .map_err(|error| error.to_string())?;
+
+    let input_path = match chosen {
+        Some(file_path) => file_path.into_path().map_err(|error| error.to_string())?,
+        None => return Ok(None),
+    };
+
     let root = pane_sessions_root(&app)?;
-    stage_sessions_restore_from_zip(&root, Path::new(&input_path))
+    stage_sessions_restore_from_zip(&root, &input_path)?;
+    Ok(Some(input_path.to_string_lossy().into_owned()))
 }
 
 #[cfg(test)]
@@ -1503,4 +1625,101 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod security_tests {
+    use super::*;
+
+    #[test]
+    fn label_validator_accepts_pane_labels() {
+        assert!(is_safe_webview_label("tab-t1"));
+        assert!(is_safe_webview_label("tab-tab-abc-123"));
+        assert!(is_safe_webview_label("tab-weird-id--"));
+        assert!(is_safe_webview_label("tab-A_b-9"));
+    }
+
+    #[test]
+    fn label_validator_rejects_main_and_non_tab_labels() {
+        // "main" điều hướng/đóng cửa sổ chính -> phải bị từ chối.
+        assert!(!is_safe_webview_label("main"));
+        assert!(!is_safe_webview_label(""));
+        assert!(!is_safe_webview_label("tab-")); // thiếu phần id
+        assert!(!is_safe_webview_label("other-t1"));
+        assert!(!is_safe_webview_label("Tab-t1")); // sai hoa/thường tiền tố
+        assert!(!is_safe_webview_label(" tab-t1"));
+        assert!(!is_safe_webview_label("tab-t1/../main"));
+        assert!(!is_safe_webview_label("tab t1"));
+        assert!(validate_webview_label("main").is_err());
+        assert!(validate_webview_label("tab-t1").is_ok());
+    }
+
+    #[test]
+    fn label_validator_enforces_length_cap() {
+        let long = format!("tab-{}", "a".repeat(200));
+        assert!(long.len() > 128);
+        assert!(!is_safe_webview_label(&long));
+        let ok = format!("tab-{}", "a".repeat(120));
+        assert!(ok.len() <= 128);
+        assert!(is_safe_webview_label(&ok));
+    }
+
+    #[test]
+    fn tab_status_strips_control_chars_and_caps_title() {
+        let mut status = NativeTabStatus {
+            title: format!("Hi\u{0007}\tthere\n{}", "x".repeat(600)),
+            url: String::new(),
+            favicon_url: "https://example.com/favicon.ico".to_string(),
+            is_loading: false,
+        };
+        sanitize_native_tab_status(&mut status);
+        assert!(!status.title.chars().any(|c| c.is_control()));
+        assert!(status.title.starts_with("Hithere"));
+        assert!(status.title.chars().count() <= 512);
+        assert_eq!(status.favicon_url, "https://example.com/favicon.ico");
+    }
+
+    #[test]
+    fn tab_status_rejects_non_http_favicon() {
+        for bad in [
+            "javascript:alert(1)",
+            "data:image/png;base64,AAAA",
+            "file:///etc/passwd",
+            "not a url",
+            "",
+        ] {
+            let mut status = NativeTabStatus {
+                title: "t".to_string(),
+                url: String::new(),
+                favicon_url: bad.to_string(),
+                is_loading: false,
+            };
+            sanitize_native_tab_status(&mut status);
+            assert_eq!(status.favicon_url, "", "favicon `{bad}` should be dropped");
+        }
+    }
+
+    #[test]
+    fn tab_status_caps_favicon_length() {
+        let mut status = NativeTabStatus {
+            title: "t".to_string(),
+            url: String::new(),
+            favicon_url: format!("https://example.com/{}", "a".repeat(3000)),
+            is_loading: false,
+        };
+        sanitize_native_tab_status(&mut status);
+        assert_eq!(status.favicon_url, "");
+    }
+
+    #[test]
+    fn today_utc_is_iso_date_shape() {
+        let today = today_utc_yyyy_mm_dd();
+        assert_eq!(today.len(), 10);
+        let parts: Vec<&str> = today.split('-').collect();
+        assert_eq!(parts.len(), 3);
+        assert_eq!(parts[0].len(), 4);
+        assert_eq!(parts[1].len(), 2);
+        assert_eq!(parts[2].len(), 2);
+        assert!(parts.iter().all(|p| p.chars().all(|c| c.is_ascii_digit())));
+    }
 }

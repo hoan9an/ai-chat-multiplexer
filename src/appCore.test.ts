@@ -13,9 +13,11 @@ import {
   getTabKey,
   getTabTitle,
   hydrateTabs,
+  isAllowedWebviewUrl,
   isPaneDragControl,
   isTauriRuntime,
   loadAppState,
+  normalizeAppState,
   LEGACY_LAYOUT_KEY,
   LEGACY_STATE_V3_KEY,
   LEGACY_STATE_V4_KEY,
@@ -26,6 +28,7 @@ import {
   type ChatPane,
   type ChatTab,
 } from "./appCore";
+import { getNewTabUrl, isNewTabUrl, NEW_TAB_ICON, NEW_TAB_TITLE } from "./newtab";
 
 describe("compareVersions", () => {
   it("returns 0 for equal versions", () => {
@@ -113,12 +116,35 @@ describe("resolveAddress", () => {
   });
 });
 
+describe("isAllowedWebviewUrl", () => {
+  it("allows http/https URLs", () => {
+    expect(isAllowedWebviewUrl("https://example.com")).toBe(true);
+    expect(isAllowedWebviewUrl("http://localhost:1420")).toBe(true);
+  });
+
+  it("allows about:blank and local newtab", () => {
+    expect(isAllowedWebviewUrl("about:blank")).toBe(true);
+    expect(isAllowedWebviewUrl(new URL("/newtab.html", window.location.href).toString())).toBe(true);
+  });
+
+  it("rejects non-web schemes", () => {
+    expect(isAllowedWebviewUrl("file:///etc/passwd")).toBe(false);
+    expect(isAllowedWebviewUrl("javascript:alert(1)")).toBe(false);
+    expect(isAllowedWebviewUrl("data:text/html,hi")).toBe(false);
+  });
+});
+
 describe("getOriginFallbackIcon", () => {
   it("returns the favicon path for valid URLs", () => {
     expect(getOriginFallbackIcon("https://example.com/path")).toBe(
       "https://example.com/favicon.ico",
     );
     expect(getOriginFallbackIcon("github.com/foo")).toBe("https://github.com/favicon.ico");
+  });
+
+  it("returns the bundled app icon for new-tab URLs", () => {
+    expect(getOriginFallbackIcon(getNewTabUrl())).toBe(NEW_TAB_ICON);
+    expect(getOriginFallbackIcon("/newtab.html")).toBe(NEW_TAB_ICON);
   });
 
   it("returns null/favicon.ico for opaque-origin URLs (about:blank etc.)", () => {
@@ -338,6 +364,16 @@ describe("createDefaultWorkspace", () => {
     expect(ws.panes).toHaveLength(1);
     expect(ws.panes[0].profileId).toBe(DEFAULT_PROFILE_ID);
     expect(ws.panes[0].tabs).toHaveLength(1);
+  });
+
+  it("starts with the local new-tab page instead of an external site", () => {
+    const ws = createDefaultWorkspace();
+    const tab = ws.panes[0].tabs[0];
+    expect(isNewTabUrl(tab.url)).toBe(true);
+    expect(tab.loadedUrl).toBe(tab.url);
+    expect(tab.currentUrl).toBe(tab.url);
+    expect(tab.title).toBe(NEW_TAB_TITLE);
+    expect(tab.faviconUrl).toBe(NEW_TAB_ICON);
   });
 });
 
@@ -878,7 +914,10 @@ describe("loadAppState", () => {
     expect(state.workspaces[0].panes[0].profileId).toBe(DEFAULT_PROFILE_ID);
   });
 
-  it("loadAppState handles pane with missing tabs in current STORAGE_KEY (line 333 fallback)", () => {
+  it("loadAppState rejects a pane with missing tabs and falls back to default state", () => {
+    // A pane with no tabs is structurally unrenderable. normalizeAppState now
+    // rejects it (returns null) so loadAppState falls back to a fresh default
+    // state instead of white-screening on a broken/empty pane.
     const saved = {
       workspaces: [
         {
@@ -901,7 +940,9 @@ describe("loadAppState", () => {
     };
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
     const state = loadAppState();
-    expect(state.workspaces[0].panes[0].tabs).toEqual([]);
+    // Fresh default state: exactly one workspace with a real pane and tab.
+    expect(state.workspaces).toHaveLength(1);
+    expect(state.workspaces[0].panes[0].tabs.length).toBeGreaterThan(0);
   });
 
   it("v4 migration: profile with name=undefined falls back to 'Default' (line 292 ?? right side)", () => {
@@ -968,5 +1009,77 @@ describe("loadAppState", () => {
     // Falls through to legacy/default initialisation — workspaces still produced.
     expect(Array.isArray(state.workspaces)).toBe(true);
     expect(state.workspaces.length).toBeGreaterThan(0);
+  });
+});
+
+describe("normalizeAppState", () => {
+  function makeState(overrides: Partial<AppState> = {}): AppState {
+    return {
+      workspaces: [
+        {
+          id: "ws",
+          name: "X",
+          columns: 1,
+          panes: [
+            {
+              id: "p",
+              title: "p",
+              profileId: DEFAULT_PROFILE_ID,
+              activeTabId: "t1",
+              tabs: [
+                { id: "t1", title: "a", url: "https://a", loadedUrl: "https://a" },
+                { id: "t2", title: "b", url: "https://b", loadedUrl: "https://b" },
+              ],
+            },
+          ],
+        },
+      ],
+      activeWorkspaceId: "ws",
+      profiles: [{ id: DEFAULT_PROFILE_ID, name: "Default" }],
+      ...overrides,
+    };
+  }
+
+  it("returns null when a pane has an empty tabs array", () => {
+    const broken = makeState();
+    broken.workspaces[0].panes[0].tabs = [];
+    expect(normalizeAppState(broken)).toBeNull();
+  });
+
+  it("repairs activeTabId that does not exist by falling back to the first tab", () => {
+    const state = makeState();
+    state.workspaces[0].panes[0].activeTabId = "ghost-tab";
+    const normalized = normalizeAppState(state);
+    expect(normalized).not.toBeNull();
+    expect(normalized!.workspaces[0].panes[0].activeTabId).toBe("t1");
+  });
+
+  it("keeps a valid activeTabId untouched", () => {
+    const state = makeState();
+    state.workspaces[0].panes[0].activeTabId = "t2";
+    const normalized = normalizeAppState(state);
+    expect(normalized!.workspaces[0].panes[0].activeTabId).toBe("t2");
+  });
+
+  it("re-routes a pane with a missing profileId to DEFAULT_PROFILE_ID", () => {
+    const state = makeState();
+    state.workspaces[0].panes[0].profileId = "missing-profile";
+    const normalized = normalizeAppState(state);
+    expect(normalized!.workspaces[0].panes[0].profileId).toBe(DEFAULT_PROFILE_ID);
+  });
+
+  it("returns null when a workspace has no panes", () => {
+    const state = makeState();
+    state.workspaces[0].panes = [];
+    expect(normalizeAppState(state)).toBeNull();
+  });
+
+  it("returns null when there are no workspaces", () => {
+    expect(normalizeAppState(makeState({ workspaces: [] }))).toBeNull();
+  });
+
+  it("falls back activeWorkspaceId to the first workspace when it is unknown", () => {
+    const normalized = normalizeAppState(makeState({ activeWorkspaceId: "nope" }));
+    expect(normalized!.activeWorkspaceId).toBe("ws");
   });
 });

@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="icon" type="image/png" href="/app-icon.png" />
 <title>New Tab — AI Multiplexer</title>
 <style>
   :root {
@@ -309,8 +310,21 @@
         event.preventDefault();
         var url = resolveAddress(input.value);
         if (!url) return;
-        try { window.top.location.assign(url); } catch (e) { window.location.assign(url); }
+        navigateFromNewTab(url);
       });
+    }
+
+    function navigateFromNewTab(url) {
+      if (!url) return;
+      try {
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage({ type: 'ai-chat-multiplexer:navigate', url: url }, window.location.origin);
+          return;
+        }
+      } catch (e) {
+        // Fall through to direct navigation when the parent cannot be reached.
+      }
+      window.location.assign(url);
     }
 
     // Force same-window navigation in case any platform tries to open externally
@@ -319,11 +333,7 @@
       if (!link) return;
       event.preventDefault();
       var url = link.getAttribute('data-target');
-      try {
-        window.top.location.assign(url);
-      } catch (e) {
-        window.location.assign(url);
-      }
+      navigateFromNewTab(url);
     }, true);
   </script>
 </body>

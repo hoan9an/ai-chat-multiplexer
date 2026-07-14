@@ -1,4 +1,5 @@
 import type { MutableRefObject, PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useRef } from "react";
 import {
   IconArrowLeft,
   IconArrowRight,
@@ -12,12 +13,18 @@ import {
   getDisplayUrl,
   getTabKey,
   getTabTitle,
+  getFallbackTabTitle,
+  getOriginFallbackIcon,
+  isAllowedWebviewUrl,
   isPaneDragControl,
+  isTauriRuntime,
   normalizeUrl,
+  resolveAddress,
   type ChatPane,
   type ChatTab,
   type Profile,
 } from "../appCore";
+import { isNewTabUrl, withNewTabLang } from "../newtab";
 import { useTranslation } from "../i18n";
 
 type PaneDragRef = MutableRefObject<{
@@ -136,12 +143,59 @@ export function Pane({
   moveTabAcrossPanes,
   detachTabToNewPane,
 }: PaneProps) {
-  const { t } = useTranslation();
+  const { t, lang } = useTranslation();
+  // Set synchronously before blur() when the user cancels URL editing (Escape).
+  // blur() fires onBlur synchronously — before React re-renders — so commitTabUrl
+  // would otherwise read the stale draft and commit a half-typed URL. The blur
+  // handler checks and clears this flag to skip the commit on cancel.
+  const cancelUrlEditRef = useRef(false);
   const activeTab = pane.tabs.find((tab) => tab.id === pane.activeTabId) ?? pane.tabs[0];
-  const activeUrl = normalizeUrl(activeTab.loadedUrl);
+  const activeUrl = normalizeUrl(withNewTabLang(activeTab.loadedUrl, lang));
+  const activeIsNewTab = isNewTabUrl(activeTab.loadedUrl);
+  const shouldRenderFrame = activeIsNewTab || !isTauriRuntime();
   const activeDisplayUrl = getDisplayUrl(activeTab);
   const activeTabKey = getTabKey(pane.id, activeTab.id);
   const activeAddressValue = editingUrls[activeTabKey] ?? activeDisplayUrl;
+  const frameRef = useRef<HTMLIFrameElement | null>(null);
+
+  useEffect(() => {
+    function handleNewTabNavigate(event: MessageEvent) {
+      if (event.origin !== window.location.origin) return;
+      if (event.source !== frameRef.current?.contentWindow) return;
+      if (!isNewTabUrl(activeTab.loadedUrl)) return;
+      if (
+        !event.data ||
+        typeof event.data !== "object" ||
+        event.data.type !== "ai-chat-multiplexer:navigate" ||
+        typeof event.data.url !== "string"
+      ) {
+        return;
+      }
+
+      const loadedUrl = resolveAddress(event.data.url);
+      if (!isAllowedWebviewUrl(loadedUrl)) return;
+
+      updateActivePane(pane.id, (current) => ({
+        ...current,
+        tabs: current.tabs.map((tab) =>
+          tab.id === activeTab.id
+            ? {
+                ...tab,
+                title: getFallbackTabTitle(loadedUrl),
+                url: loadedUrl,
+                loadedUrl,
+                currentUrl: loadedUrl,
+                faviconUrl: getOriginFallbackIcon(loadedUrl),
+                isLoading: true,
+              }
+            : tab,
+        ),
+      }));
+    }
+
+    window.addEventListener("message", handleNewTabNavigate);
+    return () => window.removeEventListener("message", handleNewTabNavigate);
+  }, [activeTab.id, activeTab.loadedUrl, pane.id, updateActivePane]);
 
   return (
     <article
@@ -488,13 +542,24 @@ export function Pane({
               value={activeAddressValue}
               onChange={(event) => updateEditingUrl(pane.id, activeTab.id, event.target.value)}
               onFocus={() => startEditingUrl(pane.id, activeTab)}
-              onBlur={() => commitTabUrl(pane.id, activeTab.id)}
+              onBlur={() => {
+                // On Escape the draft was already dropped and this blur must not
+                // commit. Clear the flag and bail so the stale draft never lands.
+                if (cancelUrlEditRef.current) {
+                  cancelUrlEditRef.current = false;
+                  return;
+                }
+                commitTabUrl(pane.id, activeTab.id);
+              }}
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
                   event.currentTarget.blur();
                 }
 
                 if (event.key === "Escape") {
+                  // Mark this blur as a cancel BEFORE blur() so the synchronous
+                  // onBlur skips commitTabUrl and the tab does not navigate.
+                  cancelUrlEditRef.current = true;
                   setEditingUrls((current) => {
                     const next = { ...current };
                     delete next[activeTabKey];
@@ -518,12 +583,19 @@ export function Pane({
           }}
         >
           <iframe
-            className="chat-frame"
+            className={shouldRenderFrame ? "chat-frame" : "chat-frame chat-frame-hidden"}
+            ref={frameRef}
             key={`${activeTab.id}-${activeUrl}`}
-            src={activeUrl}
+            src={shouldRenderFrame ? activeUrl : "about:blank"}
             title={`${pane.title} / ${activeTab.title}`}
             sandbox="allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts allow-downloads"
           />
+          {!shouldRenderFrame && (
+            <div className="webview-loading" aria-live="polite">
+              <span className="webview-loading-spinner" aria-hidden="true" />
+              <span>{activeTab.isLoading ? t("pane.loading") : t("pane.ready")}</span>
+            </div>
+          )}
           <div className="frame-fallback">
             <span className="preview-badge">{t("pane.webPreview")}</span>
             <h2>{activeTab.title}</h2>

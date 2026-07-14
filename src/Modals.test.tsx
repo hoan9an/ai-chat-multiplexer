@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 import { fireEvent, render, screen, cleanup, waitFor } from "@testing-library/react";
-import { ConfirmDialog, TextPromptModal } from "./components/Modals";
+import { AlertDialog, ConfirmDialog, TextPromptModal } from "./components/Modals";
 
 afterEach(cleanup);
 
@@ -141,6 +141,29 @@ describe("TextPromptModal", () => {
   });
 });
 
+describe("AlertDialog", () => {
+  it("renders nothing when dialog is null", () => {
+    const { container } = render(<AlertDialog dialog={null} onClose={() => undefined} />);
+    expect(container.children).toHaveLength(0);
+  });
+
+  it("renders title, message, and default OK label", () => {
+    render(
+      <AlertDialog dialog={{ title: "Thông báo", message: "Xong rồi" }} onClose={() => undefined} />,
+    );
+    expect(screen.getByText("Thông báo")).toBeDefined();
+    expect(screen.getByText("Xong rồi")).toBeDefined();
+    expect(screen.getByRole("button", { name: "OK" })).toBeDefined();
+  });
+
+  it("calls onClose when OK is clicked", () => {
+    const onClose = vi.fn();
+    render(<AlertDialog dialog={{ title: "T", message: "M" }} onClose={onClose} />);
+    fireEvent.click(screen.getByRole("button", { name: "OK" }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("ConfirmDialog", () => {
   it("renders nothing when dialog is null", () => {
     const { container } = render(
@@ -174,6 +197,16 @@ describe("ConfirmDialog", () => {
       />,
     );
     expect(screen.getByRole("button", { name: "Xác nhận" })).toBeDefined();
+  });
+
+  it("can hide the cancel button", () => {
+    render(
+      <ConfirmDialog
+        dialog={{ title: "T", message: "M", hideCancel: true, onConfirm: () => undefined }}
+        onClose={() => undefined}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: "Hủy" })).toBeNull();
   });
 
   it("applies danger class when danger=true", () => {

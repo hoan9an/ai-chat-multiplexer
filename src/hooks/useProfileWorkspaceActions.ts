@@ -8,7 +8,7 @@ import {
   type Profile,
   type Workspace,
 } from "../appCore";
-import { getNewTabUrl, NEW_TAB_TITLE } from "../newtab";
+import { getNewTabUrl, NEW_TAB_ICON, NEW_TAB_TITLE } from "../newtab";
 import { useTranslation } from "../i18n";
 import type { ConfirmDialogOptions, TextPromptOptions } from "../types/dialogs";
 
@@ -61,6 +61,7 @@ export function useProfileWorkspaceActions({
           url: newTabUrl,
           loadedUrl: newTabUrl,
           currentUrl: newTabUrl,
+          faviconUrl: NEW_TAB_ICON,
         },
       ],
     };

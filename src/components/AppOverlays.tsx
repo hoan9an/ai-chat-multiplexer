@@ -1,17 +1,14 @@
-import type { ConfirmDialogOptions } from "../types/dialogs";
+import type {
+  AlertDialogOptions,
+  ConfirmDialogOptions,
+  TextPromptState,
+} from "../types/dialogs";
 import type { DownloadToast, ThemeMode } from "../appCore";
-import type { UpdateStatus, BackupBusy } from "./SettingsModal";
-import { ConfirmDialog, TextPromptModal } from "./Modals";
+import type { UpdateStatus, BackupBusy } from "../types/updates";
+import { AlertDialog, ConfirmDialog, TextPromptModal } from "./Modals";
 import { SettingsModal } from "./SettingsModal";
 import { DownloadToastStack } from "./DownloadToastStack";
 import { DownloadsPanel } from "./DownloadsPanel";
-
-type TextPromptState = {
-  title: string;
-  initial: string;
-  placeholder?: string;
-  onSubmit: (value: string) => void;
-};
 
 export interface AppOverlaysProps {
   textPrompt: TextPromptState | null;
@@ -22,6 +19,8 @@ export interface AppOverlaysProps {
 
   confirmDialog: ConfirmDialogOptions | null;
   setConfirmDialog: (dialog: ConfirmDialogOptions | null) => void;
+  alertDialog: AlertDialogOptions | null;
+  setAlertDialog: (dialog: AlertDialogOptions | null) => void;
 
   isSettingsOpen: boolean;
   setIsSettingsOpen: (open: boolean) => void;
@@ -55,6 +54,8 @@ export function AppOverlays(props: AppOverlaysProps) {
     submitTextPrompt,
     confirmDialog,
     setConfirmDialog,
+    alertDialog,
+    setAlertDialog,
     isSettingsOpen,
     setIsSettingsOpen,
     theme,
@@ -104,6 +105,8 @@ export function AppOverlays(props: AppOverlaysProps) {
       />
 
       <ConfirmDialog dialog={confirmDialog} onClose={() => setConfirmDialog(null)} />
+
+      <AlertDialog dialog={alertDialog} onClose={() => setAlertDialog(null)} />
 
       <DownloadToastStack
         toasts={downloadToasts}
