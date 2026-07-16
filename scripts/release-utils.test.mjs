@@ -108,6 +108,74 @@ test("smoke report requires every case to pass and binds the tested artifact has
   }
 });
 
+test("publish smoke policy allows updater restart to be deferred until after publication", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "aicm-release-smoke-policy-"));
+  try {
+    const installer = "AI.Chat.Multiplexer_1.2.3_x64-setup.exe";
+    fs.writeFileSync(path.join(dir, installer), "installer");
+    const valid = {
+      schemaVersion: 1,
+      tag: "v1.2.3",
+      appVersion: "1.2.3",
+      testedArtifact: installer,
+      testedArtifactSha256: sha256File(path.join(dir, installer)),
+      windowsVersion: "Windows 11 24H2",
+      webview2Version: "136.0",
+      testedAt: "2026-07-16T00:00:00.000Z",
+      tester: "release-qa",
+      evidenceRef: "PRIVATE-EVIDENCE-001",
+      cases: Object.fromEntries([
+        "authenticode",
+        "cleanInstall",
+        "firstRun",
+        "existingUpgrade",
+        "updaterInstallRestart",
+        "newTabLanguages",
+        "multiPaneProfiles",
+        "popupAndOAuth",
+        "download",
+        "configBackupRestore",
+        "fullBackupRestoreAndInvalidArchive",
+        "restartPersistence",
+        "uninstallRelaunch",
+      ].map((name) => [name, "PASS"])),
+      notes: "",
+    };
+    const deferredUpdater = {
+      ...valid,
+      cases: { ...valid.cases, updaterInstallRestart: "BLOCKED" },
+    };
+    validateSmokeReport(deferredUpdater, {
+      tag: "v1.2.3",
+      version: "1.2.3",
+      assetsDir: dir,
+      requireUpdater: false,
+    });
+    assert.throws(
+      () => validateSmokeReport(deferredUpdater, {
+        tag: "v1.2.3",
+        version: "1.2.3",
+        assetsDir: dir,
+      }),
+      /not green/,
+    );
+    assert.throws(
+      () => validateSmokeReport({
+        ...valid,
+        cases: { ...valid.cases, updaterInstallRestart: "FAIL" },
+      }, {
+        tag: "v1.2.3",
+        version: "1.2.3",
+        assetsDir: dir,
+        requireUpdater: false,
+      }),
+      /not green/,
+    );
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 function writeCompleteReleaseFixture(dir) {
   const root = path.resolve(import.meta.dirname, "..");
   const version = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")).version;

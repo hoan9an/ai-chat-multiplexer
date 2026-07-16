@@ -10,8 +10,10 @@ only letters, digits, dot, underscore, or hyphen. Keep screenshots and videos in
 the separately controlled evidence store; never put a URL or filesystem path in
 the report. Keep `notes` empty unless it contains only non-sensitive issue IDs.
 
-Allowed report values are `PASS`, `FAIL`, `BLOCKED`, and `NOT-TESTED`, but the
-publish gate accepts only `PASS` for every schema case.
+Allowed report values are `PASS`, `FAIL`, `BLOCKED`, and `NOT-TESTED`. The
+publish gate accepts only `PASS` for every schema case except
+`updaterInstallRestart`, which may be `BLOCKED` or `NOT-TESTED` before
+publication because GitHub draft releases are not served as `latest`.
 
 ## Environment
 
@@ -55,3 +57,7 @@ the approved fallback itself was exercised successfully.
 
 Never attach a full backup, profile directory, cookie, token, prompt, chat
 content, full URL, private key, or provider credential to release evidence.
+
+Run `updaterInstallRestart` immediately after publication against GitHub
+`latest`. If it fails, do not rewrite the published tag; publish a higher patch
+release.

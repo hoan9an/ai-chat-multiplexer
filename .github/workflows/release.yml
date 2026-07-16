@@ -280,7 +280,7 @@ jobs:
                 '- Supported after native smoke approval: Windows 10/11 x64 with WebView2 Evergreen.',
                 '- Experimental and unsupported: macOS and Linux artifacts.',
                 '- Tauri updater signatures and Authenticode were verified by the release gate.',
-                '- Publication still requires `native-smoke-report.json` and production approval.',
+                '- Publication still requires `native-smoke-report.json`, production approval, and post-publication updater smoke follow-up.',
                 '',
                 `Source commit: ${context.sha}`,
                 `Workflow: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
@@ -297,3 +297,4 @@ jobs:
         run: |
           echo "Release candidate ${GITHUB_REF_NAME} remains draft." >> "$GITHUB_STEP_SUMMARY"
           echo "Complete scripts/native-smoke-report.template.json and upload it to the draft before running Publish release." >> "$GITHUB_STEP_SUMMARY"
+          echo "The updater install/restart case may remain BLOCKED for draft publication and must be exercised immediately after publishing." >> "$GITHUB_STEP_SUMMARY"

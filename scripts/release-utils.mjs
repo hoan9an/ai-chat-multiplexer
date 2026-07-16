@@ -293,7 +293,7 @@ export function verifyChecksums(assetsDir, requiredFiles) {
   }
 }
 
-export function validateSmokeReport(report, { tag, version, assetsDir }) {
+export function validateSmokeReport(report, { tag, version, assetsDir, requireUpdater = true }) {
   const requiredFields = [
     "schemaVersion",
     "tag",
@@ -379,7 +379,12 @@ export function validateSmokeReport(report, { tag, version, assetsDir }) {
   }
   const failed = requiredCases
     .map((name) => [name, cases[name]])
-    .filter(([, result]) => result !== "PASS");
+    .filter(([name, result]) => {
+      if (!requireUpdater && name === "updaterInstallRestart") {
+        return !["PASS", "BLOCKED", "NOT-TESTED"].includes(result);
+      }
+      return result !== "PASS";
+    });
   if (failed.length > 0) {
     throw new Error(`Smoke gate is not green: ${failed.map(([name, value]) => `${name}=${value}`).join(", ")}`);
   }

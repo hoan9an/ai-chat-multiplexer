@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Existing draft tag to verify and publish (for example v0.1.11)"
+        description: "Existing draft tag to verify and publish (for example v0.1.12)"
         required: true
         type: string
 
@@ -134,3 +134,4 @@ jobs:
               prerelease: false,
               make_latest: 'true',
             });
+            core.notice(`Published ${tag}. Run the updater install/restart smoke against GitHub latest immediately and ship a patch release if it fails.`);

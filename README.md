@@ -2,7 +2,7 @@
 
 AI Chat Multiplexer is a local-first desktop workspace for running multiple AI web apps side by side. It is built with Tauri 2, React 19, TypeScript, Vite, and a Rust backend that manages native child webviews, per-profile browser session storage, downloads, backups, restores, and desktop updates.
 
-![Status](https://img.shields.io/badge/status-active-success) ![Version](https://img.shields.io/badge/version-0.1.11-blue) ![Tauri](https://img.shields.io/badge/Tauri-2-orange) ![React](https://img.shields.io/badge/React-19-blue) ![License](https://img.shields.io/badge/license-MIT-green)
+![Status](https://img.shields.io/badge/status-active-success) ![Version](https://img.shields.io/badge/version-0.1.12-blue) ![Tauri](https://img.shields.io/badge/Tauri-2-orange) ![React](https://img.shields.io/badge/React-19-blue) ![License](https://img.shields.io/badge/license-MIT-green)
 
 Languages: [English](./README.md) · [Tiếng Việt](./README.vi.md) · [中文](./README.zh.md)
 
@@ -260,7 +260,7 @@ Completed downloads can be opened directly or revealed in the platform file mana
 
 ## Updates And Releases
 
-The app version is currently `0.1.11` in:
+The app version is currently `0.1.12` in:
 
 - `package.json`
 - `src/appCore.ts`
@@ -275,7 +275,7 @@ https://github.com/hoan9an/ai-chat-multiplexer/releases/latest/download/latest.j
 
 The release workflow runs on `v*` tags and creates a draft release candidate. Matrix jobs build macOS, Linux, and Windows artifacts; one post-build gate then creates the merged `latest.json`, verifies exact asset inventory, updater signatures, Authenticode evidence, SHA256, source archive, version lock, and provenance. It does not publish the draft.
 
-Publication is a separate manually dispatched workflow protected by the `production-release` environment. It requires a complete `native-smoke-report.json`, re-downloads and verifies the entire candidate after approval, checks updater signatures and tag/asset identity again, and only then publishes the draft. Windows 10/11 x64 with WebView2 Evergreen is the supported beta target. macOS and Linux artifacts are experimental.
+Publication is a separate manually dispatched workflow protected by the `production-release` environment. It requires a complete `native-smoke-report.json`, re-downloads and verifies the entire candidate after approval, checks updater signatures and tag/asset identity again, and only then publishes the draft. Because GitHub does not expose draft releases through `releases/latest`, the updater install/restart case is an explicit post-publication smoke gate; a failing updater smoke requires a patch release. Windows 10/11 x64 with WebView2 Evergreen is the supported beta target. macOS and Linux artifacts are experimental.
 
 Required GitHub Actions secrets for signed updater artifacts:
 

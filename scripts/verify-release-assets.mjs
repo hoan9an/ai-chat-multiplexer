@@ -88,7 +88,12 @@ if (phase === "automated" || phase === "publish") {
 
 if (phase === "publish") {
   const smokeFile = requireOne(files, /^native-smoke-report\.json$/, "native smoke report");
-  validateSmokeReport(readJson(path.join(assetsDir, smokeFile)), { tag, version, assetsDir });
+  validateSmokeReport(readJson(path.join(assetsDir, smokeFile)), {
+    tag,
+    version,
+    assetsDir,
+    requireUpdater: false,
+  });
 }
 
 console.log(`Release assets verified for ${tag} at phase ${phase}: ${files.length} files`);

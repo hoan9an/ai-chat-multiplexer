@@ -39,37 +39,33 @@ Any missing, duplicate, empty, unexpected, stale, misnamed, or hash-mismatched
 asset blocks the candidate. Fix the source/workflow and use a new version tag if
 the tag has already been published.
 
-## Current updater-smoke blocker
+## Updater smoke policy
 
 The installed application checks
 `https://github.com/hoan9an/ai-chat-multiplexer/releases/latest/download/latest.json`.
 GitHub's `latest` release endpoint does not expose draft releases. Therefore an
 installed older version cannot discover or install the exact draft candidate,
-and `updaterInstallRestart` cannot truthfully be marked `PASS` before publication
-with the current single-channel architecture.
+and `updaterInstallRestart` cannot truthfully be marked `PASS` before
+publication with the current single-channel architecture.
 
-Do not bypass this by editing the report or weakening signature verification.
-Before the first gated candidate can be published, choose and implement one of
-these release-policy changes:
-
-1. Add a separately authenticated staging update channel that can serve the
-   signed draft manifest and assets to controlled QA machines.
-2. Change publication policy so updater install/restart is an explicit
-   post-publication smoke gate, with a documented patch-release response if it
-   fails.
-
-Until one option is implemented and exercised, keep `updaterInstallRestart` as
-`NOT-TESTED` or `BLOCKED`. The current publish verifier will correctly reject
-that report, so this is a release blocker rather than a local test failure.
+Do not bypass this by editing the updater endpoint, weakening signature
+verification, or fabricating a passing report. For this Windows-first beta,
+publication accepts `updaterInstallRestart` as `BLOCKED` or `NOT-TESTED` only
+when every other smoke case is `PASS`. Immediately after publication, run the
+updater install/restart smoke against GitHub `latest`. If it fails, keep the
+release notes honest and ship a higher patch release with the fix; do not rewrite
+the published tag or mutate published assets.
 
 ## Native approval and publication
 
 1. Download the draft Windows NSIS installer and record its SHA256.
 2. Complete [native-smoke-checklist.md](native-smoke-checklist.md) on controlled
    Windows machines. Use dedicated provider test accounts.
-3. Fill `scripts/native-smoke-report.template.json`. Every required case must be
-   `PASS`; do not include account identifiers, prompts, chat content, cookies,
-   tokens, full URLs, full paths, or private evidence.
+3. Fill `scripts/native-smoke-report.template.json`. Every required case except
+   `updaterInstallRestart` must be `PASS`; keep `updaterInstallRestart` as
+   `BLOCKED` or `NOT-TESTED` until post-publication updater smoke is exercised.
+   Do not include account identifiers, prompts, chat content, cookies, tokens,
+   full URLs, full paths, or private evidence.
 4. Upload the file as exactly `native-smoke-report.json` to the draft.
 5. Dispatch `Publish verified release` for the exact draft tag.
 6. A reviewer approves `production-release` only after reviewing the draft,
@@ -78,6 +74,9 @@ that report, so this is a release blocker rather than a local test failure.
 7. After approval, the workflow downloads and verifies the entire draft again,
    cryptographically checks updater signatures, confirms the tag target, and
    only then publishes it as latest.
+8. Immediately test updater install/restart from an older supported install to
+   the newly published GitHub `latest`. Record the result in the release issue or
+   private evidence store, and ship a patch release if it fails.
 
 ## Failure and rollback
 

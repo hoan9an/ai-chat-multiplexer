@@ -14,7 +14,7 @@
     "cleanInstall": "NOT-TESTED",
     "firstRun": "NOT-TESTED",
     "existingUpgrade": "NOT-TESTED",
-    "updaterInstallRestart": "NOT-TESTED",
+    "updaterInstallRestart": "BLOCKED",
     "newTabLanguages": "NOT-TESTED",
     "multiPaneProfiles": "NOT-TESTED",
     "popupAndOAuth": "NOT-TESTED",
