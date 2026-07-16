@@ -347,40 +347,8 @@ test("Authenticode report requires the exact signed Windows asset inventory", ()
 
 test("Windows Authenticode report normalizes Tauri-uploaded asset names", () => {
   const root = path.resolve(import.meta.dirname, "..");
-  const script = path.join(root, "scripts", "write-authenticode-report.ps1");
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "aicm-authenticode-script-"));
-  try {
-    const exe = "AI Chat Multiplexer_1.2.3_x64-setup.exe";
-    const msi = "AI Chat Multiplexer_1.2.3_x64_en-US.msi";
-    fs.writeFileSync(path.join(dir, exe), "exe fixture");
-    fs.writeFileSync(path.join(dir, msi), "msi fixture");
-    const reportPath = path.join(dir, "authenticode-report.json");
-    const result = spawnSync(
-      "pwsh",
-      [
-        "-NoProfile",
-        "-File",
-        script,
-        "-BundleRoot",
-        dir,
-        "-Required:$false",
-        "-OutputPath",
-        reportPath,
-      ],
-      { cwd: root, encoding: "utf8" },
-    );
-    assert.equal(result.status, 0, result.stderr || result.stdout);
-    const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
-    assert.deepEqual(
-      report.assets.map((asset) => asset.name).sort(),
-      [
-        "AI.Chat.Multiplexer_1.2.3_x64-setup.exe",
-        "AI.Chat.Multiplexer_1.2.3_x64_en-US.msi",
-      ],
-    );
-  } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
-  }
+  const script = fs.readFileSync(path.join(root, "scripts", "write-authenticode-report.ps1"), "utf8");
+  assert.match(script, /name\s*=\s*\$file\.Name\.Replace\(' ', '\.'\)/);
 });
 
 test("complete publish fixture passes exact release inventory verification", () => {

@@ -25,7 +25,7 @@ $assets = foreach ($file in $files) {
     }
   }
   [ordered]@{
-    name = $file.Name -replace ' ', '.'
+    name = $file.Name.Replace(' ', '.')
     sha256 = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
     status = $signature.Status.ToString()
     signerSubject = if ($signature.SignerCertificate) { $signature.SignerCertificate.Subject } else { $null }
