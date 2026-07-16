@@ -140,7 +140,7 @@ jobs:
               release_id: release.id,
               name: `AI Chat Multiplexer ${tag} unsigned Windows beta`,
               draft: false,
-              prerelease: true,
+              prerelease: false,
               make_latest: 'true',
             });
             core.notice(`Published ${tag} as an unsigned Windows beta. Run install/update smoke against GitHub latest immediately and ship a patch release if it fails.`);

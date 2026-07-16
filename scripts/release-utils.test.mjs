@@ -44,6 +44,13 @@ test("release workflows find draft releases by list API", () => {
   }
 });
 
+test("publish workflow publishes a normal latest release", () => {
+  const root = path.resolve(import.meta.dirname, "..");
+  const candidate = fs.readFileSync(path.join(root, ".github", "workflows", "publish-release.yml"), "utf8");
+  assert.match(candidate, /prerelease:\s*false/);
+  assert.match(candidate, /make_latest:\s*'true'/);
+});
+
 test("smoke report requires every case to pass and binds the tested artifact hash", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "aicm-release-test-"));
   try {
