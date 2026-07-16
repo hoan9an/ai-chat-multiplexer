@@ -316,15 +316,15 @@ describe("useNativeWebviews", () => {
     expect(closes).toContain("tab-t2");
   });
 
-  it("sanitizes profile id with non-alnum characters before invoking upsert", () => {
+  it("passes an already validated profile id to the native upsert command", () => {
     const state = makeState(
-      [makeWorkspace("ws1", [makePane("p1", "prof@x.y", [makeTab("t1", "https://a")])])],
+      [makeWorkspace("ws1", [makePane("p1", "prof-x_y", [makeTab("t1", "https://a")])])],
       "ws1",
     );
     setupHookWithShells(state, null, false, ["p1"]);
 
     const upserts = calls("native_webview_upsert");
-    expect(upserts[0][1]).toMatchObject({ request: { profileId: "prof-x-y" } });
+    expect(upserts[0][1]).toMatchObject({ request: { profileId: "prof-x_y" } });
   });
 
   it("logs an error and continues when native_webview_upsert rejects", async () => {

@@ -1,0 +1,94 @@
+name: Bug report
+description: Report a reproducible app, provider, backup, update, or install problem.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not attach a full backup, profile directory, cookie, token, prompt, chat content, full URL, full path, account identifier, credential, or private key. You may attach a support bundle only after reviewing it.
+  - type: input
+    id: app-version
+    attributes:
+      label: App version
+      description: Find this in Settings, for example 0.1.11.
+    validations:
+      required: true
+  - type: input
+    id: windows-version
+    attributes:
+      label: Windows version
+      description: Edition, release, and build number. Do not include the Windows username.
+    validations:
+      required: true
+  - type: input
+    id: webview2-version
+    attributes:
+      label: WebView2 version
+      description: Enter Unknown if it cannot be determined.
+    validations:
+      required: true
+  - type: dropdown
+    id: provider
+    attributes:
+      label: Provider
+      options:
+        - Not provider-specific
+        - ChatGPT
+        - Claude
+        - Gemini
+        - Perplexity
+        - DeepSeek
+        - Grok
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: flow
+    attributes:
+      label: Flow
+      options:
+        - Install or first run
+        - Login or OAuth
+        - New Tab or navigation
+        - Popup or new window
+        - Pane, tab, workspace, or profile
+        - Download
+        - Config backup or restore
+        - Full backup or restore
+        - Update
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      description: Use provider/flow names, not private page content or full URLs.
+      placeholder: |
+        1. Open ...
+        2. Select ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: observed
+    attributes:
+      label: Observed behavior
+      description: Include an event code from a reviewed support bundle when available.
+    validations:
+      required: true
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy check
+      options:
+        - label: I removed account identifiers, prompts, chat content, cookies, tokens, full URLs, full paths, backups, session files, credentials, and private keys.
+          required: true

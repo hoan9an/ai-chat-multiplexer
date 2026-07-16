@@ -3,6 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { isTauriRuntime, type DownloadEventPayload, type DownloadToast } from "../appCore";
 import { useTranslation } from "../i18n";
+import { recordDiagnostic } from "../diagnostics";
 
 /**
  * Manages the download toast list:
@@ -45,6 +46,14 @@ export function useDownloadManager() {
             },
           ]);
         } else if (payload.kind === "finished") {
+          if (!payload.success) {
+            recordDiagnostic({
+              component: "download",
+              code: "DOWNLOAD_FAILED",
+              severity: "error",
+              context: { result: "failed" },
+            });
+          }
           setToasts((prev) => {
             // Try exact id match first (label + path), then fall back to a
             // path-only match (different webview started the download but the

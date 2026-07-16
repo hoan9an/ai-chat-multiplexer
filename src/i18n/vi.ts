@@ -13,6 +13,13 @@ export const vi = {
   "common.delete": "Xóa",
   "common.notice": "Thông báo",
 
+  // Provider popup policy
+  "popup.blockedTitle": "Popup đã bị chặn",
+  "popup.blankBlocked":
+    "Trang này yêu cầu một popup trống rồi mới điều hướng. App không thể chuyển flow này thành tab một cách an toàn.",
+  "popup.schemeBlocked":
+    "App chỉ chuyển popup HTTP/HTTPS thành tab. Scheme mà trang yêu cầu không được hỗ trợ.",
+
   // Settings modal
   "settings.title": "Settings",
   "settings.appearance": "Giao diện",
@@ -26,6 +33,40 @@ export const vi = {
   "settings.updates": "Cập nhật",
   "settings.currentVersion": "Phiên bản hiện tại",
   "settings.backupRestore": "Backup & khôi phục",
+
+  // Diagnostics
+  "diagnostics.title": "Chẩn đoán & hỗ trợ",
+  "diagnostics.help":
+    "Bundle chỉ chứa phiên bản, môi trường và mã sự kiện đã lược bỏ dữ liệu nhạy cảm. File được lưu cục bộ và không tự upload.",
+  "diagnostics.export": "Xuất support bundle",
+  "diagnostics.exportTitle": "Kiểm tra support bundle",
+  "diagnostics.exportPreview":
+    "Bundle có {count} sự kiện cùng phiên bản app, Windows/kiến trúc và WebView2. Không gồm cookie, token, prompt, nội dung chat, full URL, đường dẫn đầy đủ hoặc file session. Bạn tự quyết định nơi lưu và có gửi file hay không.",
+  "diagnostics.saveTitle": "Lưu support bundle",
+  "diagnostics.exportFailedTitle": "Không thể xuất support bundle",
+  "diagnostics.exportFailed": "Không thể lưu file chẩn đoán. Mã lỗi đã được ghi cục bộ.",
+
+  // First run and support
+  "onboarding.firstRun": "Thiết lập lần đầu",
+  "onboarding.title": "Bắt đầu với một workflow",
+  "onboarding.dismiss": "Đóng hướng dẫn",
+  "onboarding.checkChoose": "Chọn một template phù hợp với công việc",
+  "onboarding.checkSignIn": "Đăng nhập trực tiếp trên từng dịch vụ AI",
+  "onboarding.checkRun": "Thực hiện cùng một task và so sánh kết quả",
+  "onboarding.compareThree": "So sánh 3 AI",
+  "onboarding.compareThreeDescription": "ChatGPT, Claude và Gemini trong ba pane.",
+  "onboarding.codingReview": "Review code",
+  "onboarding.codingReviewDescription": "Claude và ChatGPT trong hai pane.",
+  "onboarding.research": "Nghiên cứu",
+  "onboarding.researchDescription": "Perplexity, Gemini và ChatGPT trong ba pane.",
+  "onboarding.skip": "Bỏ qua",
+  "onboarding.showAgain": "Mở lại hướng dẫn",
+  "support.reportIssue": "Báo lỗi",
+  "support.knownIssues": "Các lỗi đã biết",
+  "support.privacyTitle": "Kiểm tra dữ liệu trước khi báo lỗi",
+  "support.privacyMessage":
+    "GitHub sẽ mở ở trình duyệt ngoài. Chỉ đính kèm support bundle sau khi đã tự kiểm tra. Không gửi full backup, thư mục profile, cookie, token, prompt, nội dung chat, URL đầy đủ hoặc đường dẫn đầy đủ.",
+  "support.continue": "Mở form báo lỗi",
 
   // Updates
   "update.check": "Kiểm tra cập nhật",
@@ -56,6 +97,7 @@ export const vi = {
   "backup.exportError": "Export lỗi: {msg}",
   "backup.importError": "Import lỗi: {msg}",
   "backup.invalidConfig": "File không phải config hợp lệ",
+  "backup.configTooLarge": "File cấu hình vượt giới hạn 10 MiB.",
   "backup.replaceConfigTitle": "Thay thế cấu hình hiện tại?",
   "backup.replaceConfigMsg":
     "Tất cả workspace và profile hiện tại sẽ bị thay bằng nội dung từ file.",
@@ -68,6 +110,8 @@ export const vi = {
     "App sẽ restart để backup đầy đủ file session:\n• {zip}\n• {config}\n\nKhi đổi máy hoặc Windows user, một số tài khoản có thể cần đăng nhập lại.",
   "backup.startupBackupSuccess":
     "Backup hoàn tất:\n• {zip}\n• {config}\n\nDùng file ZIP để restore; giữ file JSON để tương thích. Không chia sẻ các file này.",
+  "backup.startupBackupZipOnly":
+    "File ZIP backup tự chứa đã hoàn tất:\n• {zip}\n\nCó thể dùng ZIP này để restore. JSON sidecar tương thích không được tạo; không chia sẻ file ZIP.",
   "backup.startupBackupError": "Backup lỗi sau khi restart: {msg}",
   "backup.startupRestoreSuccess":
     "Restore hoàn tất. Trạng thái app và file session profile đã được áp dụng. Một số tài khoản có thể cần đăng nhập lại khi đổi máy hoặc Windows user.",
@@ -93,6 +137,9 @@ export const vi = {
   "backup.restartNow": "Restart ngay",
   "backup.restartManual": "Không thể tự restart. Hãy đóng và mở lại app thủ công.",
   "backup.restoreError": "Restore lỗi: {msg}",
+  "backup.unencryptedConsent":
+    "Tôi hiểu full backup hiện chưa mã hóa và có thể chứa cookie/token phiên đăng nhập. Tôi sẽ lưu như dữ liệu mật và không gửi file này cho support.",
+  "backup.restoring": "Đang restore…",
 
   // Pane
   "pane.tabsOf": "Tab của {title}",

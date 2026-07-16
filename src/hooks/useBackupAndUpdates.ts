@@ -5,6 +5,7 @@ import {
   APP_VERSION,
   GITHUB_REPO,
   RELEASES_URL,
+  STORAGE_KEY,
   compareVersions,
   isTauriRuntime,
   normalizeAppState,
@@ -13,6 +14,7 @@ import {
 import type { Update } from "@tauri-apps/plugin-updater";
 import type { UpdateStatus, BackupBusy } from "../types/updates";
 import type { AlertDialogOptions, ConfirmDialogOptions } from "../types/dialogs";
+import { recordDiagnostic } from "../diagnostics";
 
 export type { UpdateStatus, BackupBusy };
 
@@ -34,6 +36,9 @@ interface StartupOperationResult {
   configRestored?: boolean | null;
   warnings?: string[];
 }
+
+const MAX_CONFIG_JSON_BYTES = 10 * 1024 * 1024;
+
 export interface UseBackupAndUpdatesResult {
   updateStatus: UpdateStatus;
   backupBusy: BackupBusy;
@@ -115,14 +120,26 @@ export function useBackupAndUpdates({
 
         safeResults.forEach((result) => {
           if (result.operation === "backup") {
+            if (!result.success) {
+              recordDiagnostic({
+                component: "backup",
+                code: "FULL_BACKUP_STARTUP_FAILED",
+                severity: "error",
+              });
+            }
             messages.push(
               result.success
-                ? t("backup.startupBackupSuccess", {
-                    zip: result.zipPath ?? "",
-                    config: result.configPath ?? "",
-                  })
+                ? result.configPath
+                  ? t("backup.startupBackupSuccess", {
+                      zip: result.zipPath ?? "",
+                      config: result.configPath,
+                    })
+                  : t("backup.startupBackupZipOnly", {
+                      zip: result.zipPath ?? "",
+                    })
                 : t("backup.startupBackupError", { msg: result.message }),
             );
+            (result.warnings ?? []).forEach((warning) => messages.push(warning));
             return;
           }
 
@@ -130,6 +147,7 @@ export function useBackupAndUpdates({
             if (result.success && result.configJson) {
               const restoredState = appStateFromJson(result.configJson);
               if (restoredState) {
+                window.localStorage.setItem(STORAGE_KEY, JSON.stringify(restoredState));
                 setState(restoredState);
                 setFocusedPaneId(null);
                 messages.push(t("backup.startupRestoreSuccess"));
@@ -143,6 +161,11 @@ export function useBackupAndUpdates({
                   : t("backup.startupRestoreSuccess"),
               );
             } else {
+              recordDiagnostic({
+                component: "restore",
+                code: "FULL_RESTORE_STARTUP_FAILED",
+                severity: "error",
+              });
               messages.push(t("backup.startupRestoreError", { msg: result.message }));
             }
 
@@ -153,12 +176,28 @@ export function useBackupAndUpdates({
           messages.push(result.message);
         });
 
+        if (safeResults.length > 0) {
+          void Promise.resolve(invoke("acknowledge_session_startup_results")).catch((error) => {
+            recordDiagnostic({
+              component: "restore",
+              code: "STARTUP_RESULT_ACK_FAILED",
+              severity: "error",
+            });
+            console.error("acknowledge_session_startup_results failed", error);
+          });
+        }
+
         if (messages.length > 0) {
           showAlert(messages.join("\n\n"));
         }
       })
       .catch((error) => {
         if (!cancelled) {
+          recordDiagnostic({
+            component: "restore",
+            code: "STARTUP_RESULT_READ_FAILED",
+            severity: "error",
+          });
           console.error("session_startup_results failed", error);
         }
       })
@@ -245,6 +284,11 @@ export function useBackupAndUpdates({
         return;
       }
       setUpdateStatus({ kind: "error", message });
+      recordDiagnostic({
+        component: "updater",
+        code: "UPDATE_CHECK_FAILED",
+        severity: "error",
+      });
     }
   }
 
@@ -289,6 +333,11 @@ export function useBackupAndUpdates({
       await relaunch();
     } catch (error) {
       pendingUpdate.current = null;
+      recordDiagnostic({
+        component: "updater",
+        code: "UPDATE_INSTALL_FAILED",
+        severity: "error",
+      });
       setUpdateStatus({
         kind: "error",
         message: error instanceof Error ? error.message : String(error),
@@ -347,6 +396,11 @@ export function useBackupAndUpdates({
         URL.revokeObjectURL(url);
       }
     } catch (error) {
+      recordDiagnostic({
+        component: "backup",
+        code: "CONFIG_EXPORT_FAILED",
+        severity: "error",
+      });
       showAlert(t("backup.exportError", { msg: error instanceof Error ? error.message : String(error) }));
     } finally {
       setBackupBusy("idle");
@@ -369,23 +423,32 @@ export function useBackupAndUpdates({
           setBackupBusy("idle");
           return;
         }
-        const { readTextFile } = await import("@tauri-apps/plugin-fs").catch(() => ({
+        const { readTextFile, stat } = await import("@tauri-apps/plugin-fs").catch(() => ({
           readTextFile: null as null | ((p: string) => Promise<string>),
+          stat: null as null | ((p: string) => Promise<{ size: number }>),
         }));
-        if (!readTextFile) throw new Error(t("backup.fsUnavailable"));
+        if (!readTextFile || !stat) throw new Error(t("backup.fsUnavailable"));
+        const fileInfo = await stat(filePath);
+        if (fileInfo.size > MAX_CONFIG_JSON_BYTES) {
+          throw new Error(t("backup.configTooLarge"));
+        }
         text = await readTextFile(filePath);
       } else {
-        text = await new Promise<string | null>((resolve) => {
+        text = await new Promise<string | null>((resolve, reject) => {
           const input = document.createElement("input");
           input.type = "file";
           input.accept = "application/json";
-          input.onchange = async () => {
+          input.onchange = () => {
             const file = input.files?.[0];
             if (!file) {
               resolve(null);
               return;
             }
-            resolve(await file.text());
+            if (file.size > MAX_CONFIG_JSON_BYTES) {
+              reject(new Error(t("backup.configTooLarge")));
+              return;
+            }
+            void file.text().then(resolve, reject);
           };
           input.click();
         });
@@ -410,6 +473,11 @@ export function useBackupAndUpdates({
         },
       });
     } catch (error) {
+      recordDiagnostic({
+        component: "backup",
+        code: "CONFIG_IMPORT_FAILED",
+        severity: "error",
+      });
       showAlert(t("backup.importError", { msg: error instanceof Error ? error.message : String(error) }));
     } finally {
       setBackupBusy("idle");
@@ -442,6 +510,11 @@ export function useBackupAndUpdates({
         onConfirm: restartApp,
       });
     } catch (error) {
+      recordDiagnostic({
+        component: "backup",
+        code: "FULL_BACKUP_SCHEDULE_FAILED",
+        severity: "error",
+      });
       showAlert(
         t("backup.backupError", {
           msg: error instanceof Error ? error.message : String(error),
@@ -471,6 +544,7 @@ export function useBackupAndUpdates({
         try {
           const inputPath = await invoke<string | null>("restore_sessions_zip");
           if (!inputPath) {
+            setConfirmDialog(null);
             return;
           }
           setConfirmDialog({
@@ -481,11 +555,25 @@ export function useBackupAndUpdates({
             onConfirm: restartApp,
           });
         } catch (error) {
-          showAlert(t("backup.restoreError", { msg: error instanceof Error ? error.message : String(error) }));
+          const message = error instanceof Error ? error.message : String(error);
+          if (/restore.*(?:bị hủy|cancelled)|(?:bị hủy|cancelled).*restore/i.test(message)) {
+            setConfirmDialog(null);
+            return;
+          }
+          recordDiagnostic({
+            component: "restore",
+            code: "FULL_RESTORE_STAGE_FAILED",
+            severity: "error",
+          });
+          showAlert(t("backup.restoreError", { msg: message }));
         } finally {
           setBackupBusy("idle");
         }
       },
+      onCancelWhileBusy: async () => {
+        await invoke("cancel_restore_sessions").catch(() => undefined);
+      },
+      busyLabel: t("backup.restoring"),
     });
   }
 

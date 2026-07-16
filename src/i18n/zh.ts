@@ -9,6 +9,13 @@ export const zh: Dictionary = {
   "common.delete": "删除",
   "common.notice": "提示",
 
+  // Provider popup policy
+  "popup.blockedTitle": "弹出窗口已阻止",
+  "popup.blankBlocked":
+    "此页面先请求空白弹窗再跳转。应用无法安全地把此流程转换为标签页。",
+  "popup.schemeBlocked":
+    "应用只会把 HTTP/HTTPS 弹窗转换为标签页。请求的协议不受支持。",
+
   // Settings modal
   "settings.title": "设置",
   "settings.appearance": "外观",
@@ -22,6 +29,40 @@ export const zh: Dictionary = {
   "settings.updates": "更新",
   "settings.currentVersion": "当前版本",
   "settings.backupRestore": "备份与恢复",
+
+  // Diagnostics
+  "diagnostics.title": "诊断与支持",
+  "diagnostics.help":
+    "支持包只包含版本、环境和已脱敏的事件代码。文件仅保存在本地，不会自动上传。",
+  "diagnostics.export": "导出支持包",
+  "diagnostics.exportTitle": "检查支持包",
+  "diagnostics.exportPreview":
+    "支持包包含 {count} 个事件，以及应用版本、Windows/架构和 WebView2。它不包含 Cookie、令牌、提示词、聊天内容、完整 URL、完整路径或会话文件。保存位置和是否分享均由您决定。",
+  "diagnostics.saveTitle": "保存支持包",
+  "diagnostics.exportFailedTitle": "无法导出支持包",
+  "diagnostics.exportFailed": "无法保存诊断文件。错误事件代码已记录在本地。",
+
+  // First run and support
+  "onboarding.firstRun": "首次设置",
+  "onboarding.title": "从工作流程开始",
+  "onboarding.dismiss": "关闭引导",
+  "onboarding.checkChoose": "为当前任务选择一个模板",
+  "onboarding.checkSignIn": "在各 AI 服务中直接登录",
+  "onboarding.checkRun": "执行相同任务并比较结果",
+  "onboarding.compareThree": "比较 3 个 AI",
+  "onboarding.compareThreeDescription": "在三个窗格中打开 ChatGPT、Claude 和 Gemini。",
+  "onboarding.codingReview": "代码审查",
+  "onboarding.codingReviewDescription": "在两个窗格中打开 Claude 和 ChatGPT。",
+  "onboarding.research": "研究",
+  "onboarding.researchDescription": "在三个窗格中打开 Perplexity、Gemini 和 ChatGPT。",
+  "onboarding.skip": "跳过",
+  "onboarding.showAgain": "再次显示引导",
+  "support.reportIssue": "报告问题",
+  "support.knownIssues": "已知问题",
+  "support.privacyTitle": "报告前检查数据",
+  "support.privacyMessage":
+    "GitHub 将在外部浏览器中打开。仅在检查后附加支持包。请勿发送完整备份、配置文件目录、Cookie、令牌、提示词、聊天内容、完整 URL 或完整路径。",
+  "support.continue": "打开问题表单",
 
   // Updates
   "update.check": "检查更新",
@@ -52,6 +93,7 @@ export const zh: Dictionary = {
   "backup.exportError": "导出失败：{msg}",
   "backup.importError": "导入失败：{msg}",
   "backup.invalidConfig": "文件不是有效的配置",
+  "backup.configTooLarge": "配置文件超过 10 MiB 限制。",
   "backup.replaceConfigTitle": "替换当前配置？",
   "backup.replaceConfigMsg": "当前所有工作区和配置文件将被文件内容替换。",
   "backup.replace": "替换",
@@ -62,6 +104,8 @@ export const zh: Dictionary = {
     "应用将重启，并在 WebView2 锁定会话文件前创建完整备份：\n• {zip}\n• {config}\n\n换电脑或 Windows 用户时，部分账号可能需要重新登录。",
   "backup.startupBackupSuccess":
     "备份完成：\n• {zip}\n• {config}\n\n使用 ZIP 恢复；保留 JSON 用于兼容。不要分享这些文件。",
+  "backup.startupBackupZipOnly":
+    "自包含备份 ZIP 已完成：\n• {zip}\n\n此 ZIP 可用于恢复。兼容性 JSON 边车文件未创建；请勿分享该 ZIP。",
   "backup.startupBackupError": "重启后备份失败：{msg}",
   "backup.startupRestoreSuccess":
     "恢复完成。应用状态和配置文件会话文件已应用。换电脑或 Windows 用户时，部分账号可能需要重新登录。",
@@ -87,6 +131,9 @@ export const zh: Dictionary = {
   "backup.restartNow": "立即重启",
   "backup.restartManual": "无法自动重启。请手动关闭并重新打开应用。",
   "backup.restoreError": "恢复失败：{msg}",
+  "backup.unencryptedConsent":
+    "我了解完整备份目前未加密，可能包含登录会话 Cookie/令牌。我会把它作为机密数据保存，并且不会发送给支持人员。",
+  "backup.restoring": "正在恢复…",
 
   // Pane
   "pane.tabsOf": "{title} 的标签页",

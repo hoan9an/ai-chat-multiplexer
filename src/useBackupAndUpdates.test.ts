@@ -27,6 +27,7 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
 
 const writeTextFileSpy = vi.fn();
 const readTextFileSpy = vi.fn();
+const statSpy = vi.fn();
 let writeTextFileExportNull = false;
 let readTextFileExportNull = false;
 vi.mock("@tauri-apps/plugin-fs", () => ({
@@ -36,6 +37,7 @@ vi.mock("@tauri-apps/plugin-fs", () => ({
   get readTextFile() {
     return readTextFileExportNull ? null : (p: string) => readTextFileSpy(p);
   },
+  stat: (p: string) => statSpy(p),
 }));
 
 const updaterCheck = vi.fn();
@@ -59,7 +61,7 @@ vi.mock("./appCore", async () => {
 
 import { useBackupAndUpdates } from "./hooks/useBackupAndUpdates";
 import type { AppState } from "./appCore";
-import { APP_VERSION } from "./appCore";
+import { APP_VERSION, STORAGE_KEY } from "./appCore";
 
 function makeState(): AppState {
   return {
@@ -125,6 +127,7 @@ describe("backup/restore product wording", () => {
     "backup.fullDesktopOnly",
     "backup.backupScheduledMsg",
     "backup.startupBackupSuccess",
+    "backup.startupBackupZipOnly",
     "backup.startupRestoreSuccess",
     "backup.startupRestorePartial",
     "backup.startupRestoreConfigError",
@@ -192,7 +195,7 @@ describe("backup/restore product wording", () => {
   });
 });
 
-describe("useBackupAndUpdates", () => {
+  describe("useBackupAndUpdates", () => {
   beforeEach(() => {
     tauriRuntime = false;
     invokeSpy.mockReset();
@@ -253,6 +256,18 @@ describe("useBackupAndUpdates", () => {
       expect(setAlertDialog).toHaveBeenCalledWith(
         expect.objectContaining({ message: expect.stringContaining("Restore hoàn tất") }),
       );
+      expect(JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? "{}")).toMatchObject({
+        activeWorkspaceId: "ws-restored",
+      });
+      expect(invokeSpy).toHaveBeenCalledWith(
+        "acknowledge_session_startup_results",
+        undefined,
+      );
+      const setStateOrder = setStateSpy.mock.invocationCallOrder[0];
+      const ackCall = invokeSpy.mock.calls.findIndex(
+        ([command]) => command === "acknowledge_session_startup_results",
+      );
+      expect(setStateOrder).toBeLessThan(invokeSpy.mock.invocationCallOrder[ackCall]);
     });
 
     it("does not replace state when restored config is invalid", async () => {
@@ -274,6 +289,61 @@ describe("useBackupAndUpdates", () => {
       expect(setAlertDialog).toHaveBeenCalledWith(
         expect.objectContaining({ message: expect.stringContaining("warning text") }),
       );
+    });
+
+    it("does not acknowledge restore evidence when restored state cannot be persisted", async () => {
+      tauriRuntime = true;
+      const restoredState = makeState();
+      restoredState.activeWorkspaceId = "ws1";
+      invokeSpy.mockResolvedValueOnce([
+        {
+          operation: "restore",
+          success: true,
+          message: "ok",
+          configJson: JSON.stringify(restoredState),
+          configRestored: true,
+          warnings: [],
+        },
+      ]);
+      const setItemSpy = vi
+        .spyOn(Storage.prototype, "setItem")
+        .mockImplementation(() => {
+          throw new DOMException("Access denied", "SecurityError");
+        });
+
+      const { result, setStateSpy } = setupHook();
+
+      await waitFor(() => expect(result.current.startupRestoreProcessing).toBe(false));
+      expect(setStateSpy).not.toHaveBeenCalled();
+      expect(invokeSpy).not.toHaveBeenCalledWith(
+        "acknowledge_session_startup_results",
+        undefined,
+      );
+      setItemSpy.mockRestore();
+    });
+
+    it("reports a self-contained ZIP accurately when the optional sidecar failed", async () => {
+      tauriRuntime = true;
+      invokeSpy.mockResolvedValueOnce([
+        {
+          operation: "backup",
+          success: true,
+          message: "Backup hoàn tất",
+          zipPath: "C:/tmp/sessions.zip",
+          configPath: null,
+          warnings: ["simulated sidecar warning"],
+        },
+      ]);
+      const { result, setAlertDialog } = setupHook();
+
+      await waitFor(() => expect(result.current.startupRestoreProcessing).toBe(false));
+      expect(setAlertDialog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: expect.stringMatching(/ZIP backup tự chứa[\s\S]*simulated sidecar warning/),
+        }),
+      );
+      const message = setAlertDialog.mock.calls[0][0].message as string;
+      expect(message).not.toContain("• \n");
     });
   });
 
@@ -667,7 +737,10 @@ describe("useBackupAndUpdates", () => {
   });
 
   describe("importConfigJson (browser)", () => {
-    function mockFileInput(text: string | null) {
+    function mockFileInput(
+      text: string | null,
+      options: { size?: number; readError?: Error } = {},
+    ) {
       const realCreate = document.createElement.bind(document);
       vi.spyOn(document, "createElement").mockImplementation((tag: string) => {
         const el = realCreate(tag) as HTMLInputElement;
@@ -678,6 +751,15 @@ describe("useBackupAndUpdates", () => {
                 Object.defineProperty(el, "files", { value: [], configurable: true });
               } else {
                 const file = new File([text], "config.json", { type: "application/json" });
+                if (options.size !== undefined) {
+                  Object.defineProperty(file, "size", {
+                    value: options.size,
+                    configurable: true,
+                  });
+                }
+                if (options.readError) {
+                  file.text = () => Promise.reject(options.readError);
+                }
                 Object.defineProperty(el, "files", { value: [file], configurable: true });
               }
               el.onchange?.(new Event("change"));
@@ -780,6 +862,38 @@ describe("useBackupAndUpdates", () => {
       expect(setAlertDialog).not.toHaveBeenCalled();
       expect(result.current.backupBusy).toBe("idle");
     });
+
+    it("rejects an oversized browser config before reading it", async () => {
+      mockFileInput("{}", { size: 10 * 1024 * 1024 + 1 });
+      const { result, setConfirmDialog, setAlertDialog } = setupHook();
+
+      await act(async () => {
+        await result.current.importConfigJson();
+      });
+
+      await waitFor(() => expect(setAlertDialog).toHaveBeenCalledTimes(1));
+      expect(setAlertDialog).toHaveBeenCalledWith(
+        expect.objectContaining({ message: expect.stringMatching(/10 MiB/) }),
+      );
+      expect(setConfirmDialog).not.toHaveBeenCalled();
+      expect(result.current.backupBusy).toBe("idle");
+    });
+
+    it("reports browser file read errors and returns to idle", async () => {
+      mockFileInput("{}", { readError: new Error("browser read failed") });
+      const { result, setConfirmDialog, setAlertDialog } = setupHook();
+
+      await act(async () => {
+        await result.current.importConfigJson();
+      });
+
+      await waitFor(() => expect(setAlertDialog).toHaveBeenCalledTimes(1));
+      expect(setAlertDialog).toHaveBeenCalledWith(
+        expect.objectContaining({ message: expect.stringMatching(/browser read failed/) }),
+      );
+      expect(setConfirmDialog).not.toHaveBeenCalled();
+      expect(result.current.backupBusy).toBe("idle");
+    });
   });
 
   describe("importConfigJson (Tauri runtime)", () => {
@@ -787,6 +901,8 @@ describe("useBackupAndUpdates", () => {
       tauriRuntime = true;
       dialogOpen.mockReset();
       readTextFileSpy.mockReset();
+      statSpy.mockReset();
+      statSpy.mockResolvedValue({ size: 1024 });
     });
 
     it("reads file via plugin-fs and opens confirm dialog on valid JSON", async () => {
@@ -820,6 +936,7 @@ describe("useBackupAndUpdates", () => {
         await result.current.importConfigJson();
       });
       expect(readTextFileSpy).toHaveBeenCalledWith("C:/tmp/config.json");
+      expect(statSpy).toHaveBeenCalledWith("C:/tmp/config.json");
       expect(setConfirmDialog).toHaveBeenCalledTimes(1);
       const dialogArg = setConfirmDialog.mock.calls[0][0];
       expect(dialogArg).toEqual(
@@ -837,6 +954,23 @@ describe("useBackupAndUpdates", () => {
       });
       expect(setConfirmDialog).not.toHaveBeenCalled();
       expect(readTextFileSpy).not.toHaveBeenCalled();
+      expect(result.current.backupBusy).toBe("idle");
+    });
+
+    it("rejects an oversized config before reading its contents", async () => {
+      dialogOpen.mockResolvedValue("C:/tmp/oversized.json");
+      statSpy.mockResolvedValue({ size: 10 * 1024 * 1024 + 1 });
+      const { result, setConfirmDialog, setAlertDialog } = setupHook();
+
+      await act(async () => {
+        await result.current.importConfigJson();
+      });
+
+      expect(readTextFileSpy).not.toHaveBeenCalled();
+      expect(setConfirmDialog).not.toHaveBeenCalled();
+      expect(setAlertDialog).toHaveBeenCalledWith(
+        expect.objectContaining({ message: expect.stringMatching(/10 MiB/) }),
+      );
       expect(result.current.backupBusy).toBe("idle");
     });
 
@@ -1035,8 +1169,9 @@ describe("useBackupAndUpdates", () => {
         await dialogArg.onConfirm();
       });
       expect(invokeSpy).toHaveBeenCalledWith("restore_sessions_zip", undefined);
-      // Chỉ có dialog xác nhận ban đầu, không có dialog thành công.
-      expect(setConfirmDialog).toHaveBeenCalledTimes(1);
+      // Dialog xác nhận được đóng, không có dialog thành công.
+      expect(setConfirmDialog).toHaveBeenCalledTimes(2);
+      expect(setConfirmDialog).toHaveBeenLastCalledWith(null);
       expect(result.current.backupBusy).toBe("idle");
     });
 
@@ -1085,6 +1220,38 @@ describe("useBackupAndUpdates", () => {
         expect.objectContaining({ message: expect.stringContaining("Restore lỗi") }),
       );
       expect(result.current.backupBusy).toBe("idle");
+    });
+
+    it("treats a user-cancelled restore as cancellation instead of a failure", async () => {
+      const { result, setConfirmDialog, setAlertDialog } = setupHook();
+      await act(async () => {
+        await result.current.restoreFullBackup();
+      });
+      const dialogArg = setConfirmDialog.mock.calls[0][0];
+      invokeSpy.mockRejectedValueOnce(new Error("Restore đã bị hủy"));
+
+      await act(async () => {
+        await dialogArg.onConfirm();
+      });
+
+      expect(setConfirmDialog).toHaveBeenLastCalledWith(null);
+      expect(setAlertDialog).not.toHaveBeenCalled();
+      expect(result.current.backupBusy).toBe("idle");
+    });
+
+    it("requests native cancellation from the running restore dialog", async () => {
+      const { result, setConfirmDialog } = setupHook();
+      await act(async () => {
+        await result.current.restoreFullBackup();
+      });
+      const dialogArg = setConfirmDialog.mock.calls[0][0];
+      invokeSpy.mockResolvedValueOnce(undefined);
+
+      await act(async () => {
+        await dialogArg.onCancelWhileBusy();
+      });
+
+      expect(invokeSpy).toHaveBeenCalledWith("cancel_restore_sessions", undefined);
     });
   });
 
@@ -1321,7 +1488,7 @@ describe("useBackupAndUpdates", () => {
                 title: "P",
                 profileId: "prof-default",
                 activeTabId: "t",
-                tabs: [{ id: "t", title: "T", url: "https://y", loadedUrl: "https://y" }],
+                tabs: [{ id: "t-b", title: "T", url: "https://y", loadedUrl: "https://y" }],
               },
             ],
           },

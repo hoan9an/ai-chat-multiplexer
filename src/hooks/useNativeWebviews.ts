@@ -10,6 +10,7 @@ import {
 } from "../appCore";
 import { withNewTabLang } from "../newtab";
 import type { Lang } from "../i18n";
+import { recordDiagnostic } from "../diagnostics";
 
 type Args = {
   state: AppState;
@@ -80,13 +81,12 @@ export function useNativeWebviews({ state, focusedPaneId, suspended, shellsRef, 
               return;
             }
 
-            const profileSessionId = pane.profileId.replace(/[^a-zA-Z0-9_-]/g, "-");
             const bounds = shell!.getBoundingClientRect();
             visibleLabels.add(label);
 
             void invoke("native_webview_upsert", {
               request: {
-                profileId: profileSessionId,
+                profileId: pane.profileId,
                 label,
                 url: normalizedUrl,
                 x: bounds.left,
@@ -94,7 +94,15 @@ export function useNativeWebviews({ state, focusedPaneId, suspended, shellsRef, 
                 width: bounds.width,
                 height: bounds.height,
               },
-            }).catch((error) => console.error("native_webview_upsert failed", error));
+            }).catch((error) => {
+              recordDiagnostic({
+                component: "webview",
+                code: "WEBVIEW_UPSERT_FAILED",
+                severity: "error",
+                context: { command: "native_webview_upsert" },
+              });
+              console.error("native_webview_upsert failed", error);
+            });
 
             // If the webview already exists with a different desired URL,
             // navigate it instead of recreating (preserves session/cookies).
@@ -103,7 +111,15 @@ export function useNativeWebviews({ state, focusedPaneId, suspended, shellsRef, 
               void invoke("native_webview_load_url", {
                 label,
                 url: normalizedUrl,
-              }).catch((error) => console.error("native_webview_load_url failed", error));
+              }).catch((error) => {
+                recordDiagnostic({
+                  component: "webview",
+                  code: "NAVIGATION_FAILED",
+                  severity: "error",
+                  context: { command: "native_webview_load_url" },
+                });
+                console.error("native_webview_load_url failed", error);
+              });
             }
             lastUrlByLabel.current[label] = normalizedUrl;
           });

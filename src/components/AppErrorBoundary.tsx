@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { STORAGE_KEY } from "../appCore";
+import { recordDiagnostic } from "../diagnostics";
 
 interface AppErrorBoundaryProps {
   children: ReactNode;
@@ -34,7 +35,13 @@ export class AppErrorBoundary extends Component<
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    // Surface the crash for diagnostics; there is no logging backend here.
+    recordDiagnostic({
+      component: "app",
+      code: "APP_RENDER_CRASH",
+      severity: "error",
+    });
+    // Keep development console context local. The support bundle records only
+    // the stable event code above and never serializes this exception/stack.
     console.error("App crashed:", error, info.componentStack);
   }
 

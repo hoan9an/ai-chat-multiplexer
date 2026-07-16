@@ -32,6 +32,12 @@ jobs:
       - name: Test
         run: npm test
 
+      - name: Release verifier tests
+        run: |
+          npm run test:release
+          VERSION="$(node -p "require('./package.json').version")"
+          node scripts/validate-version-lock.mjs "v${VERSION}"
+
   # Run the Rust job on windows-latest: it matches the app's primary target and
   # needs no webkit2gtk system-dependency setup (the Linux release job installs
   # libwebkit2gtk-4.1-dev et al; running on Windows avoids that entirely for CI).
@@ -43,6 +49,8 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
@@ -51,6 +59,12 @@ jobs:
 
       - name: Cargo check
         run: cargo check --manifest-path src-tauri/Cargo.toml
+
+      - name: Cargo format
+        run: cargo fmt --check --manifest-path src-tauri/Cargo.toml
+
+      - name: Cargo clippy
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 
       - name: Cargo test
         run: cargo test --manifest-path src-tauri/Cargo.toml

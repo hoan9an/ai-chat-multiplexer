@@ -2,7 +2,7 @@
 
 AI Chat Multiplexer is a local-first desktop workspace for running multiple AI web apps side by side. It is built with Tauri 2, React 19, TypeScript, Vite, and a Rust backend that manages native child webviews, per-profile browser session storage, downloads, backups, restores, and desktop updates.
 
-![Status](https://img.shields.io/badge/status-active-success) ![Version](https://img.shields.io/badge/version-0.1.10-blue) ![Tauri](https://img.shields.io/badge/Tauri-2-orange) ![React](https://img.shields.io/badge/React-19-blue) ![License](https://img.shields.io/badge/license-MIT-green)
+![Status](https://img.shields.io/badge/status-active-success) ![Version](https://img.shields.io/badge/version-0.1.11-blue) ![Tauri](https://img.shields.io/badge/Tauri-2-orange) ![React](https://img.shields.io/badge/React-19-blue) ![License](https://img.shields.io/badge/license-MIT-green)
 
 Languages: [English](./README.md) · [Tiếng Việt](./README.vi.md) · [中文](./README.zh.md)
 
@@ -38,6 +38,12 @@ Hooks
   useProfileWorkspaceActions profiles and workspaces
   useDownloadManager         native download event toasts/panel
   useBackupAndUpdates        config backup, full backup, restore, updater
+  useNativeNewWindowRequests managed popup/new-window routing
+  useDiagnostics             redacted local support-bundle export
+
+Product workflows
+  onboarding.ts              first-run state in a separate localStorage key
+  workflowTemplates.ts       local workspace templates with provider URLs only
 
 Rust/Tauri backend
   native webview lifecycle
@@ -64,6 +70,9 @@ React owns the workspace model, UI state, layout, and intent. Rust owns privileg
 - JSON config export/import for workspace state.
 - Full ZIP backup/restore for profile session files plus app state metadata.
 - Signed Tauri updater integration backed by GitHub Releases.
+- Managed HTTP/HTTPS popup routing into a new tab in the source pane/profile.
+- Local redacted diagnostics with user-reviewed support-bundle export.
+- Optional first-run onboarding with Compare 3 AI, Coding Review, and Research templates.
 - English, Vietnamese, and Chinese UI dictionaries.
 
 ## Data Model
@@ -117,6 +126,14 @@ Language is stored under:
 ai-chat-multiplexer-lang
 ```
 
+First-run onboarding is additive and stored separately under:
+
+```text
+ai-chat-multiplexer-onboarding-v1
+```
+
+Existing v2-v5 app state is not rewritten to add onboarding fields.
+
 The app still contains migration paths for older localStorage keys:
 
 - `ai-chat-multiplexer-state-v4`
@@ -137,6 +154,7 @@ Important implementation details:
 - Hidden tabs, inactive workspaces, modal-open states, and suspended states hide native webviews instead of leaving them exposed above the React UI.
 - Existing webviews are navigated with `native_webview_load_url` rather than recreated when possible, preserving session state.
 - `native_webview_tab_status` polls title, current URL, favicon, and loading state from the child webview, then sanitizes page-provided values before returning them to the privileged app shell.
+- `on_new_window` denies unmanaged native popups. HTTP/HTTPS requests are emitted to the React tab model and inserted after the source tab with the same profile; blank or unsupported schemes are blocked with a visible notice.
 
 The native command surface is registered in `src-tauri/src/lib.rs`:
 
@@ -149,7 +167,10 @@ The native command surface is registered in `src-tauri/src/lib.rs`:
 - `delete_profile_session`
 - `backup_sessions_zip`
 - `restore_sessions_zip`
+- `cancel_restore_sessions`
 - `session_startup_results`
+- `acknowledge_session_startup_results`
+- `diagnostics_runtime_info`
 - `reveal_path_in_folder`
 - `quit_app`
 
@@ -160,10 +181,10 @@ Profiles are browser-session containers, not just labels in the UI.
 For native webviews, Rust creates a Tauri data directory under the app data directory:
 
 ```text
-pane-sessions/{sanitized-profile-id}/
+pane-sessions/{profile-id}/
 ```
 
-Each profile gets separate cookies, local storage, cache, and related WebView session files. Deleting an unused profile can also delete its profile session directory through the `delete_profile_session` command.
+Profile IDs are validated as non-empty ASCII alphanumeric, `_`, or `-` values with a maximum length of 120 characters before they are used as directory names. They are not lossy-sanitized, so two distinct profiles cannot alias the same session directory. Each profile gets separate cookies, local storage, cache, and related WebView session files. Deleting an unused profile can also delete its profile session directory through the `delete_profile_session` command.
 
 Tab movement across panes is intentionally constrained: a tab can move from one pane to another only when both panes use the same profile. This avoids silently changing the browser session backing a loaded tab.
 
@@ -195,7 +216,12 @@ Full ZIP backup is desktop-only. It includes profile session files and app state
 
 ```text
 __ai_chat_multiplexer_backup/app-state.json
+__ai_chat_multiplexer_backup/manifest.json
 ```
+
+Format v1 records the backup format version, app version, creation time, and profile IDs. Restores remain compatible with older archives that have no manifest, but reject malformed manifests and unsupported future format versions before extraction. Archive creation streams regular files, skips symbolic links, writes through a unique temporary file, and atomically replaces an existing output without overwriting unrelated neighboring files.
+
+Restore data entries must be nested under a valid top-level profile ID. Root-level files and unsafe profile-directory names are rejected before a staged restore can replace live session data.
 
 The full backup flow is intentionally restart-oriented because WebView session files can be locked while the app is running:
 
@@ -213,6 +239,8 @@ Restore is also staged:
 3. Rust records pending restore metadata and app config, if present.
 4. On restart, Rust replaces live profile sessions with the staged sessions.
 5. Frontend applies the restored app state when valid.
+
+Only one restore may be pending at a time. Staging can be cancelled, and a failed or cancelled restore removes temporary data without replacing the live session tree. Format v1 limits archives to 10,000 entries, 4 GiB uncompressed total, 512 MiB per file, a 1,100:1 compression ratio, and 10 MiB of app-state metadata.
 
 Full backups can contain live cookies and session material. Treat them as private credentials. Restore is best-effort; protected services may require sign-in again on another machine or Windows user.
 
@@ -232,7 +260,7 @@ Completed downloads can be opened directly or revealed in the platform file mana
 
 ## Updates And Releases
 
-The app version is currently `0.1.10` in:
+The app version is currently `0.1.11` in:
 
 - `package.json`
 - `src/appCore.ts`
@@ -245,12 +273,16 @@ Desktop updates use `@tauri-apps/plugin-updater`. The configured updater endpoin
 https://github.com/hoan9an/ai-chat-multiplexer/releases/latest/download/latest.json
 ```
 
-The release workflow runs on `v*` tags, creates or reuses one draft GitHub release, builds Tauri bundles on macOS, Linux, and Windows, uploads updater artifacts including `latest.json`, and publishes the release only after all matrix builds succeed.
+The release workflow runs on `v*` tags and creates a draft release candidate. Matrix jobs build macOS, Linux, and Windows artifacts; one post-build gate then creates the merged `latest.json`, verifies exact asset inventory, updater signatures, Authenticode evidence, SHA256, source archive, version lock, and provenance. It does not publish the draft.
+
+Publication is a separate manually dispatched workflow protected by the `production-release` environment. It requires a complete `native-smoke-report.json`, re-downloads and verifies the entire candidate after approval, checks updater signatures and tag/asset identity again, and only then publishes the draft. Windows 10/11 x64 with WebView2 Evergreen is the supported beta target. macOS and Linux artifacts are experimental.
 
 Required GitHub Actions secrets for signed updater artifacts:
 
 - `TAURI_SIGNING_PRIVATE_KEY`
 - `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`
+
+Supported Windows candidates also require Authenticode certificate material and a timestamp endpoint through the repository's protected secret flow. See [`docs/release/release-gate-runbook.md`](docs/release/release-gate-runbook.md); never place private keys or certificate passwords in the repository.
 
 In non-Tauri/web fallback mode, update checks use the GitHub Releases API and open the release page for manual download.
 
@@ -264,6 +296,8 @@ The app is local-first, but it is still a desktop browser shell that renders ext
 - Page-provided tab status data is sanitized before entering app UI state.
 - Full backup/restore paths are chosen through backend dialogs, not arbitrary frontend-provided paths.
 - ZIP restore uses enclosed paths and rejects archives without valid session files.
+- Full restore is staged off the live session tree and enforces entry-count, per-file, total-size, metadata-size, path, symlink, and compression-ratio limits before startup apply.
+- Diagnostics use a local 200-event/7-day ring buffer and export allowlisted event context without prompts, chat content, cookies, tokens, full URLs, full paths, or session files.
 - Tauri capabilities are scoped in `src-tauri/capabilities/default.json`.
 
 The app does not proxy, cache, decrypt, or bypass the AI services opened inside webviews. Authentication remains between the user and each service.
@@ -275,6 +309,8 @@ The app does not proxy, cache, decrypt, or bypass the AI services opened inside 
 ├─ src/                         React/TypeScript desktop frontend
 │  ├─ App.tsx                    App composition
 │  ├─ appCore.ts                 Shared model, constants, migrations, URL helpers
+│  ├─ onboarding.ts              Separate first-run persistence
+│  ├─ workflowTemplates.ts       Pure workspace-template construction
 │  ├─ components/                UI components
 │  ├─ hooks/                     App behavior hooks
 │  ├─ i18n/                      vi/en/zh dictionaries and provider
@@ -288,7 +324,7 @@ The app does not proxy, cache, decrypt, or bypass the AI services opened inside 
 │  ├─ capabilities/default.json  Tauri permission set
 │  └─ icons/                     Bundle icons
 ├─ landing/                      Standalone static landing page
-├─ docs/assets/                  README/documentation assets
+├─ docs/                         Support, testing, security, release, and product operations
 ├─ openspec/                     Design/spec notes
 └─ .github/workflows/            CI and release automation
 ```
@@ -362,7 +398,11 @@ CI currently runs:
 
 - `npx tsc --noEmit`
 - `npm test`
+- `npm run test:release`
+- version-lock validation
 - `cargo check --manifest-path src-tauri/Cargo.toml`
+- `cargo fmt --check --manifest-path src-tauri/Cargo.toml`
+- `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings`
 - `cargo test --manifest-path src-tauri/Cargo.toml`
 
 Web-only development is useful for shell UI work, pure state logic, and most React tests. It is not sufficient for validating native child webviews, real AI site embedding behavior, profile session isolation, native downloads, full backup/restore, updater behavior, or platform file-manager integration. Use `npm run tauri dev` for those areas.
@@ -394,6 +434,8 @@ Then run the relevant local checks:
 ```bash
 npm run build
 npm test
+cargo fmt --check --manifest-path src-tauri/Cargo.toml
+cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 cargo test --manifest-path src-tauri/Cargo.toml
 ```
 

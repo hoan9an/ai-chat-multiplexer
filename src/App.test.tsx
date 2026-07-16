@@ -84,6 +84,9 @@ const dismissToast = vi.fn();
 const openFile = vi.fn();
 const revealFolder = vi.fn();
 const clearAll = vi.fn();
+const completeOnboarding = vi.fn();
+const skipOnboarding = vi.fn();
+const reopenOnboarding = vi.fn();
 
 vi.mock("./hooks/useDownloadManager", () => ({
   useDownloadManager: () => ({
@@ -100,11 +103,21 @@ vi.mock("./hooks/useNativeWebviews", () => ({
   useNativeWebviews: vi.fn(),
 }));
 
+vi.mock("./onboarding", () => ({
+  useOnboarding: () => ({
+    isOpen: false,
+    complete: completeOnboarding,
+    skip: skipOnboarding,
+    reopen: reopenOnboarding,
+  }),
+}));
+
 vi.mock("./hooks/useBackupAndUpdates", () => ({
   useBackupAndUpdates: () => ({
     updateStatus: { kind: "idle" },
     backupBusy: "idle",
     checkForUpdates: vi.fn(),
+    downloadAndInstallUpdate: vi.fn(),
     openReleasePage: vi.fn(),
     exportConfigJson: vi.fn(),
     importConfigJson: vi.fn(),
@@ -248,5 +261,8 @@ describe("App", () => {
     expect(props.openFile).toBe(openFile);
     expect(props.revealFolder).toBe(revealFolder);
     expect(props.clearAll).toBe(clearAll);
+    expect(props.isOnboardingOpen).toBe(false);
+    expect(typeof props.applyOnboardingTemplate).toBe("function");
+    expect(props.skipOnboarding).toBe(skipOnboarding);
   });
 });

@@ -10,8 +10,9 @@ describe("useAppPersistence", () => {
   });
 
   afterEach(() => {
-    vi.runOnlyPendingTimers();
+    vi.clearAllTimers();
     vi.useRealTimers();
+    vi.restoreAllMocks();
     window.localStorage.clear();
   });
 
@@ -19,6 +20,21 @@ describe("useAppPersistence", () => {
     const { result } = renderHook(() => useAppPersistence());
     expect(result.current.state.workspaces.length).toBeGreaterThan(0);
     expect(result.current.state.activeWorkspaceId).toBe(result.current.state.workspaces[0].id);
+  });
+
+  it("falls back to default state and light theme when localStorage reads are blocked", () => {
+    const getSpy = vi
+      .spyOn(Storage.prototype, "getItem")
+      .mockImplementation(() => {
+        throw new DOMException("Access denied", "SecurityError");
+      });
+
+    const { result } = renderHook(() => useAppPersistence());
+
+    expect(result.current.state.workspaces.length).toBeGreaterThan(0);
+    expect(result.current.state.activeWorkspaceId).toBe(result.current.state.workspaces[0].id);
+    expect(result.current.theme).toBe("light");
+    getSpy.mockRestore();
   });
 
   it("defaults theme to light when no saved theme", () => {
@@ -153,6 +169,30 @@ describe("useAppPersistence", () => {
       result.current.setTheme("dark");
     });
     expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe("dark");
+  });
+
+  it("keeps running when localStorage writes are blocked", () => {
+    const setSpy = vi
+      .spyOn(Storage.prototype, "setItem")
+      .mockImplementation(() => {
+        throw new DOMException("Access denied", "SecurityError");
+      });
+
+    const { result } = renderHook(() => useAppPersistence());
+
+    act(() => {
+      result.current.setTheme("dark");
+      result.current.setState({
+        ...result.current.state,
+        activeWorkspaceId: result.current.state.workspaces[0].id,
+      });
+      vi.advanceTimersByTime(600);
+      window.dispatchEvent(new Event("pagehide"));
+    });
+
+    expect(result.current.theme).toBe("dark");
+    expect(setSpy).toHaveBeenCalled();
+    setSpy.mockRestore();
   });
 
   it("writes initial state to localStorage after the mount debounce", () => {

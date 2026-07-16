@@ -156,6 +156,21 @@ describe("AlertDialog", () => {
     expect(screen.getByRole("button", { name: "OK" })).toBeDefined();
   });
 
+  it("renders review details when provided", () => {
+    render(
+      <ConfirmDialog
+        dialog={{
+          title: "Review",
+          message: "Inspect before export",
+          details: '{"events":[]}',
+          onConfirm: () => undefined,
+        }}
+        onClose={() => undefined}
+      />,
+    );
+    expect(screen.getByText('{"events":[]}')).toBeDefined();
+  });
+
   it("calls onClose when OK is clicked", () => {
     const onClose = vi.fn();
     render(<AlertDialog dialog={{ title: "T", message: "M" }} onClose={onClose} />);
@@ -304,5 +319,29 @@ describe("ConfirmDialog", () => {
     const card = container.querySelector(".modal-card")!;
     fireEvent.mouseDown(card);
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("routes backdrop dismissal through cancellation while an action is running", async () => {
+    let resolveConfirm!: () => void;
+    const onConfirm = vi.fn(() => new Promise<void>((resolve) => {
+      resolveConfirm = resolve;
+    }));
+    const onCancelWhileBusy = vi.fn();
+    const onClose = vi.fn();
+    const { container } = render(
+      <ConfirmDialog
+        dialog={{ title: "Restore", message: "M", onConfirm, onCancelWhileBusy }}
+        onClose={onClose}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "OK" }));
+    const backdrop = container.querySelector(".modal-backdrop")!;
+    fireEvent.mouseDown(backdrop, { target: backdrop, currentTarget: backdrop });
+
+    expect(onCancelWhileBusy).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
+    resolveConfirm();
+    await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1));
   });
 });

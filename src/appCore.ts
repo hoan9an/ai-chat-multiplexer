@@ -66,9 +66,20 @@ export const LEGACY_STATE_V3_KEY = "ai-chat-multiplexer-state-v3";
 export const LEGACY_LAYOUT_KEY = "ai-chat-multiplexer-layout-v2";
 export const THEME_STORAGE_KEY = "ai-chat-multiplexer-theme";
 export const DEFAULT_PROFILE_ID = "prof-default";
-export const APP_VERSION = "0.1.10";
+export const APP_VERSION = "0.1.11";
 export const GITHUB_REPO = "hoan9an/ai-chat-multiplexer";
 export const RELEASES_URL = `https://github.com/${GITHUB_REPO}/releases/latest`;
+export const SUPPORT_ISSUE_URL = `https://github.com/${GITHUB_REPO}/issues/new?template=bug-report.yml`;
+export const KNOWN_ISSUES_URL = `https://github.com/${GITHUB_REPO}/blob/main/docs/support/known-issues.md`;
+
+const MAX_ENTITY_ID_LENGTH = 120;
+const MAX_NAME_LENGTH = 256;
+const MAX_TITLE_LENGTH = 512;
+const MAX_URL_LENGTH = 8192;
+const MAX_PROFILES = 100;
+const MAX_WORKSPACES = 100;
+const MAX_PANES_PER_WORKSPACE = 100;
+const MAX_TABS_PER_PANE = 100;
 
 import { getNewTabUrl, isNewTabUrl, NEW_TAB_ICON, NEW_TAB_TITLE } from "./newtab";
 
@@ -231,6 +242,23 @@ export function getNativeWebviewLabel(_paneId: string, tab: ChatTab) {
   return `tab-${tab.id}`.replace(/[^a-zA-Z0-9_-]/g, "-");
 }
 
+export function isSafeEntityId(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.length > 0 &&
+    value.length <= MAX_ENTITY_ID_LENGTH &&
+    /^[A-Za-z0-9_-]+$/.test(value)
+  );
+}
+
+function isBoundedString(value: unknown, maxLength: number): value is string {
+  return typeof value === "string" && value.length <= maxLength;
+}
+
+function hasDuplicate<T>(values: T[]): boolean {
+  return new Set(values).size !== values.length;
+}
+
 export function hydrateTabs(tabs: ChatTab[]): ChatTab[] {
   return tabs.map((tab) => ({
     ...tab,
@@ -349,7 +377,13 @@ function migrateLegacyV4(): AppState | null {
 }
 
 export function normalizeAppState(parsed: AppState): AppState | null {
-  if (!Array.isArray(parsed.workspaces) || parsed.workspaces.length === 0) {
+  if (
+    !parsed ||
+    typeof parsed !== "object" ||
+    !Array.isArray(parsed.workspaces) ||
+    parsed.workspaces.length === 0 ||
+    parsed.workspaces.length > MAX_WORKSPACES
+  ) {
     return null;
   }
 
@@ -358,32 +392,114 @@ export function normalizeAppState(parsed: AppState): AppState | null {
       ? parsed.profiles
       : createDefaultProfiles();
 
+  if (
+    profiles.length > MAX_PROFILES ||
+    profiles.some(
+      (profile) =>
+        !profile ||
+        typeof profile !== "object" ||
+        !isSafeEntityId(profile.id) ||
+        !isBoundedString(profile.name, MAX_NAME_LENGTH),
+    ) ||
+    hasDuplicate(profiles.map((profile) => profile.id))
+  ) {
+    return null;
+  }
+
   const profileIds = new Set(profiles.map((p) => p.id));
 
+  const fallbackProfileId = profileIds.has(DEFAULT_PROFILE_ID)
+    ? DEFAULT_PROFILE_ID
+    : profiles[0].id;
+
+  const workspaceIds = parsed.workspaces.map((workspace) => workspace?.id);
+  if (
+    workspaceIds.some((id) => !isSafeEntityId(id)) ||
+    hasDuplicate(workspaceIds)
+  ) {
+    return null;
+  }
+
+  const paneIds = new Set<string>();
+  const tabIds = new Set<string>();
+
   // Reject structurally broken data (a pane with no tabs cannot render) but
-  // cheaply repair what we can: a missing/dangling profileId falls back to the
-  // default profile, and an activeTabId that no longer exists falls back to the
-  // first tab. Bail out entirely if any pane is unrepairable.
+  // cheaply repair what we can: a missing/dangling profileId falls back to a
+  // valid profile, and an activeTabId that no longer exists falls back to the
+  // first tab. IDs must remain globally unique because tab IDs become native
+  // webview labels and profile IDs become native session-directory names.
   let structurallyBroken = false;
-  const workspaces = parsed.workspaces.map((ws) => ({
-    ...ws,
-    panes: (ws.panes ?? []).map((pane) => {
-      const tabs = hydrateTabs(pane.tabs ?? []);
-      if (tabs.length === 0) {
+  const workspaces = parsed.workspaces.map((ws) => {
+    if (
+      !ws ||
+      typeof ws !== "object" ||
+      !isBoundedString(ws.name, MAX_NAME_LENGTH) ||
+      !Number.isInteger(ws.columns) ||
+      ws.columns < 1 ||
+      ws.columns > 4 ||
+      !Array.isArray(ws.panes) ||
+      ws.panes.length === 0 ||
+      ws.panes.length > MAX_PANES_PER_WORKSPACE
+    ) {
+      structurallyBroken = true;
+      return { ...ws, panes: [] };
+    }
+
+    const panes = ws.panes.map((pane) => {
+      if (
+        !pane ||
+        typeof pane !== "object" ||
+        !isSafeEntityId(pane.id) ||
+        paneIds.has(pane.id) ||
+        !isBoundedString(pane.title, MAX_TITLE_LENGTH) ||
+        !Array.isArray(pane.tabs) ||
+        pane.tabs.length === 0 ||
+        pane.tabs.length > MAX_TABS_PER_PANE
+      ) {
         structurallyBroken = true;
+        return { ...pane, tabs: [] } as ChatPane;
       }
+
+      paneIds.add(pane.id);
+      const tabsValid = pane.tabs.every((tab) => {
+        const urls = [tab?.url, tab?.loadedUrl, tab?.currentUrl].filter(
+          (value): value is string => typeof value === "string",
+        );
+        if (
+          !tab ||
+          typeof tab !== "object" ||
+          !isSafeEntityId(tab.id) ||
+          tabIds.has(tab.id) ||
+          !isBoundedString(tab.title, MAX_TITLE_LENGTH) ||
+          !isBoundedString(tab.url, MAX_URL_LENGTH) ||
+          (tab.loadedUrl !== undefined && !isBoundedString(tab.loadedUrl, MAX_URL_LENGTH)) ||
+          (tab.currentUrl !== undefined && !isBoundedString(tab.currentUrl, MAX_URL_LENGTH)) ||
+          (tab.faviconUrl !== undefined && !isBoundedString(tab.faviconUrl, MAX_URL_LENGTH)) ||
+          (tab.isLoading !== undefined && typeof tab.isLoading !== "boolean") ||
+          urls.some((url) => !isNewTabUrl(url) && !isAllowedWebviewUrl(url))
+        ) {
+          return false;
+        }
+        tabIds.add(tab.id);
+        return true;
+      });
+      if (!tabsValid) structurallyBroken = true;
+
+      const tabs = tabsValid ? hydrateTabs(pane.tabs) : [];
       const activeTabId = tabs.some((tab) => tab.id === pane.activeTabId)
         ? pane.activeTabId
         : tabs[0]?.id;
 
       return {
         ...pane,
-        profileId: profileIds.has(pane.profileId) ? pane.profileId : DEFAULT_PROFILE_ID,
+        profileId: profileIds.has(pane.profileId) ? pane.profileId : fallbackProfileId,
         activeTabId,
         tabs,
       };
-    }),
-  }));
+    });
+
+    return { ...ws, panes };
+  });
 
   if (structurallyBroken || workspaces.some((ws) => ws.panes.length === 0)) {
     return null;
@@ -396,7 +512,7 @@ export function normalizeAppState(parsed: AppState): AppState | null {
   return { workspaces, activeWorkspaceId: activeId, profiles };
 }
 
-export function loadAppState(): AppState {
+function loadAppStateFromStorage(): AppState {
   const saved = window.localStorage.getItem(STORAGE_KEY);
 
   if (saved) {
@@ -412,25 +528,42 @@ export function loadAppState(): AppState {
 
   const v4 = migrateLegacyV4();
   if (v4) {
-    window.localStorage.removeItem(LEGACY_STATE_V4_KEY);
-    return v4;
+    const normalized = normalizeAppState(v4);
+    if (normalized) {
+      window.localStorage.removeItem(LEGACY_STATE_V4_KEY);
+      return normalized;
+    }
   }
 
   const v3 = migrateLegacyV3();
   if (v3) {
-    window.localStorage.removeItem(LEGACY_STATE_V3_KEY);
-    return { ...v3, profiles: createDefaultProfiles() };
+    const normalized = normalizeAppState({ ...v3, profiles: createDefaultProfiles() });
+    if (normalized) {
+      window.localStorage.removeItem(LEGACY_STATE_V3_KEY);
+      return normalized;
+    }
   }
 
   const legacy = migrateLegacyLayout();
   if (legacy) {
-    window.localStorage.removeItem(LEGACY_LAYOUT_KEY);
-    return {
+    const normalized = normalizeAppState({
       workspaces: [legacy],
       activeWorkspaceId: legacy.id,
       profiles: createDefaultProfiles(),
-    };
+    });
+    if (normalized) {
+      window.localStorage.removeItem(LEGACY_LAYOUT_KEY);
+      return normalized;
+    }
   }
 
   return createDefaultState();
+}
+
+export function loadAppState(): AppState {
+  try {
+    return loadAppStateFromStorage();
+  } catch {
+    return createDefaultState();
+  }
 }

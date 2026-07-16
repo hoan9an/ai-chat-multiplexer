@@ -141,7 +141,7 @@ export function useProfileWorkspaceActions({
       onConfirm: () => {
         if (isTauriRuntime()) {
           void invoke("delete_profile_session", {
-            profileId: profileId.replace(/[^a-zA-Z0-9_-]/g, "-"),
+            profileId,
           }).catch((error) => console.error("delete_profile_session failed", error));
         }
         setState((current) => ({

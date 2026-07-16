@@ -818,7 +818,7 @@ describe("loadAppState", () => {
     expect(state.activeWorkspaceId).toBe("ws-only");
   });
 
-  it("v3 migration handles panes whose tabs field is missing (line 257 fallback)", () => {
+  it("v3 migration rejects panes whose tabs field is missing", () => {
     const v3 = {
       workspaces: [
         {
@@ -839,7 +839,8 @@ describe("loadAppState", () => {
     };
     window.localStorage.setItem(LEGACY_STATE_V3_KEY, JSON.stringify(v3));
     const state = loadAppState();
-    expect(state.workspaces[0].panes[0].tabs).toEqual([]);
+    expect(state.workspaces[0].id).not.toBe("ws");
+    expect(state.workspaces[0].panes[0].tabs.length).toBeGreaterThan(0);
   });
 
   it("legacy layout migration: empty panes array returns null (line 224 false)", () => {
@@ -867,7 +868,7 @@ describe("loadAppState", () => {
     expect(state.workspaces[0].columns).toBe(1);
   });
 
-  it("legacy layout migration handles pane with missing tabs (line 233 fallback)", () => {
+  it("legacy layout migration rejects a pane with missing tabs", () => {
     const legacy = {
       columns: 1,
       panes: [
@@ -881,7 +882,7 @@ describe("loadAppState", () => {
     };
     window.localStorage.setItem(LEGACY_LAYOUT_KEY, JSON.stringify(legacy));
     const state = loadAppState();
-    expect(state.workspaces[0].panes[0].tabs).toEqual([]);
+    expect(state.workspaces[0].panes[0].tabs.length).toBeGreaterThan(0);
   });
 
   it("loadAppState uses createDefaultProfiles when STORAGE_KEY has no profiles array (lines 331-333)", () => {
@@ -972,7 +973,7 @@ describe("loadAppState", () => {
     expect(state.workspaces[0].panes[0].profileId).toBe(DEFAULT_PROFILE_ID);
   });
 
-  it("v4 migration: pane with missing tabs uses [] fallback (line 310 ?? right side)", () => {
+  it("v4 migration rejects a pane with missing tabs", () => {
     const v4 = {
       workspaces: [
         {
@@ -995,7 +996,42 @@ describe("loadAppState", () => {
     };
     window.localStorage.setItem(LEGACY_STATE_V4_KEY, JSON.stringify(v4));
     const state = loadAppState();
-    expect(state.workspaces[0].panes[0].tabs).toEqual([]);
+    expect(state.workspaces[0].id).not.toBe("ws");
+    expect(state.workspaces[0].panes[0].tabs.length).toBeGreaterThan(0);
+  });
+
+  it("rejects unsafe IDs in legacy state instead of bypassing current validation", () => {
+    const legacy = {
+      workspaces: [
+        {
+          id: "unsafe workspace",
+          name: "Legacy",
+          columns: 1,
+          panes: [
+            {
+              id: "pane-safe",
+              title: "Pane",
+              activeTabId: "tab-safe",
+              tabs: [
+                {
+                  id: "tab-safe",
+                  title: "Tab",
+                  url: "https://example.com",
+                  loadedUrl: "https://example.com",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      activeWorkspaceId: "unsafe workspace",
+    };
+    window.localStorage.setItem(LEGACY_STATE_V3_KEY, JSON.stringify(legacy));
+
+    const state = loadAppState();
+
+    expect(state.workspaces[0].id).not.toBe("unsafe workspace");
+    expect(window.localStorage.getItem(LEGACY_STATE_V3_KEY)).not.toBeNull();
   });
 
   it("loadAppState falls through when STORAGE_KEY workspaces is NOT an array (line 331 false branch)", () => {
@@ -1081,5 +1117,62 @@ describe("normalizeAppState", () => {
   it("falls back activeWorkspaceId to the first workspace when it is unknown", () => {
     const normalized = normalizeAppState(makeState({ activeWorkspaceId: "nope" }));
     expect(normalized!.activeWorkspaceId).toBe("ws");
+  });
+
+  it("rejects duplicate tab IDs because they would share one native webview", () => {
+    const state = makeState();
+    state.workspaces[0].panes[0].tabs[1].id = "t1";
+    expect(normalizeAppState(state)).toBeNull();
+  });
+
+  it("rejects duplicate workspace, pane, and profile IDs", () => {
+    const duplicateWorkspace = makeState();
+    duplicateWorkspace.workspaces.push({ ...duplicateWorkspace.workspaces[0] });
+    expect(normalizeAppState(duplicateWorkspace)).toBeNull();
+
+    const duplicatePane = makeState();
+    duplicatePane.workspaces[0].panes.push({ ...duplicatePane.workspaces[0].panes[0] });
+    expect(normalizeAppState(duplicatePane)).toBeNull();
+
+    const duplicateProfile = makeState();
+    duplicateProfile.profiles.push({ ...duplicateProfile.profiles[0] });
+    expect(normalizeAppState(duplicateProfile)).toBeNull();
+  });
+
+  it("rejects IDs that cannot map one-to-one to native labels and session directories", () => {
+    const unsafeTab = makeState();
+    unsafeTab.workspaces[0].panes[0].tabs[0].id = "tab id";
+    expect(normalizeAppState(unsafeTab)).toBeNull();
+
+    const unsafeProfile = makeState();
+    unsafeProfile.profiles[0].id = "profile@work";
+    unsafeProfile.workspaces[0].panes[0].profileId = "profile@work";
+    expect(normalizeAppState(unsafeProfile)).toBeNull();
+  });
+
+  it("rejects tab URLs with unsupported schemes", () => {
+    const state = makeState();
+    state.workspaces[0].panes[0].tabs[0].loadedUrl = "javascript:alert(1)";
+    expect(normalizeAppState(state)).toBeNull();
+  });
+
+  it("uses the first valid profile when the default profile is absent", () => {
+    const state = makeState({ profiles: [{ id: "prof-work", name: "Work" }] });
+    state.workspaces[0].panes[0].profileId = "missing-profile";
+    expect(normalizeAppState(state)!.workspaces[0].panes[0].profileId).toBe("prof-work");
+  });
+
+  it("rejects invalid layout bounds and oversized entity collections", () => {
+    const badColumns = makeState();
+    badColumns.workspaces[0].columns = 99;
+    expect(normalizeAppState(badColumns)).toBeNull();
+
+    const tooManyProfiles = makeState({
+      profiles: Array.from({ length: 101 }, (_, index) => ({
+        id: `prof-${index}`,
+        name: `Profile ${index}`,
+      })),
+    });
+    expect(normalizeAppState(tooManyProfiles)).toBeNull();
   });
 });

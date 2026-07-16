@@ -160,9 +160,12 @@ export function Pane({
 
   useEffect(() => {
     function handleNewTabNavigate(event: MessageEvent) {
-      if (event.origin !== window.location.origin) return;
       if (event.source !== frameRef.current?.contentWindow) return;
       if (!isNewTabUrl(activeTab.loadedUrl)) return;
+      // The bundled New Tab iframe intentionally has an opaque origin because
+      // its sandbox omits allow-same-origin. Source-window identity plus the
+      // active bundled URL bind this message to the expected frame.
+      if (event.origin !== "null" && event.origin !== window.location.origin) return;
       if (
         !event.data ||
         typeof event.data !== "object" ||
@@ -588,7 +591,7 @@ export function Pane({
             key={`${activeTab.id}-${activeUrl}`}
             src={shouldRenderFrame ? activeUrl : "about:blank"}
             title={`${pane.title} / ${activeTab.title}`}
-            sandbox="allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts allow-downloads"
+            sandbox="allow-scripts"
           />
           {!shouldRenderFrame && (
             <div className="webview-loading" aria-live="polite">

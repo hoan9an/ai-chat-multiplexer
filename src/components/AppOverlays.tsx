@@ -9,6 +9,8 @@ import { AlertDialog, ConfirmDialog, TextPromptModal } from "./Modals";
 import { SettingsModal } from "./SettingsModal";
 import { DownloadToastStack } from "./DownloadToastStack";
 import { DownloadsPanel } from "./DownloadsPanel";
+import { OnboardingModal } from "./OnboardingModal";
+import type { WorkflowTemplateId } from "../workflowTemplates";
 
 export interface AppOverlaysProps {
   textPrompt: TextPromptState | null;
@@ -35,6 +37,14 @@ export interface AppOverlaysProps {
   importConfigJson: () => void;
   exportFullBackup: () => void;
   restoreFullBackup: () => void;
+  exportSupportBundle: () => void;
+  openSupportIssue: () => void;
+  openKnownIssues: () => void;
+
+  isOnboardingOpen: boolean;
+  applyOnboardingTemplate: (templateId: WorkflowTemplateId, name: string) => void;
+  skipOnboarding: () => void;
+  reopenOnboarding: () => void;
 
   isDownloadsOpen: boolean;
   setIsDownloadsOpen: (open: boolean) => void;
@@ -69,6 +79,13 @@ export function AppOverlays(props: AppOverlaysProps) {
     importConfigJson,
     exportFullBackup,
     restoreFullBackup,
+    exportSupportBundle,
+    openSupportIssue,
+    openKnownIssues,
+    isOnboardingOpen,
+    applyOnboardingTemplate,
+    skipOnboarding,
+    reopenOnboarding,
     isDownloadsOpen,
     setIsDownloadsOpen,
     downloadToasts,
@@ -102,6 +119,16 @@ export function AppOverlays(props: AppOverlaysProps) {
         onImportConfig={importConfigJson}
         onExportFullBackup={exportFullBackup}
         onRestoreFullBackup={restoreFullBackup}
+        onExportSupportBundle={exportSupportBundle}
+        onOpenSupportIssue={openSupportIssue}
+        onOpenKnownIssues={openKnownIssues}
+        onShowOnboarding={reopenOnboarding}
+      />
+
+      <OnboardingModal
+        open={isOnboardingOpen}
+        onApplyTemplate={applyOnboardingTemplate}
+        onSkip={skipOnboarding}
       />
 
       <ConfirmDialog dialog={confirmDialog} onClose={() => setConfirmDialog(null)} />

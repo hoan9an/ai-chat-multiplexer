@@ -1,11 +1,13 @@
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
-use tauri::webview::DownloadEvent;
+use tauri::webview::{DownloadEvent, NewWindowResponse};
 use tauri::{Emitter, LogicalPosition, LogicalSize, Manager, WebviewBuilder, WebviewUrl};
 use tauri_plugin_dialog::DialogExt;
 use walkdir::WalkDir;
@@ -53,6 +55,24 @@ struct NativeWebviewUpsertRequest {
     height: f64,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct NativeNewWindowRequest {
+    kind: String,
+    source_label: String,
+    url: Option<String>,
+    reason: String,
+    timestamp_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DiagnosticRuntimeInfo {
+    os: String,
+    arch: String,
+    webview_version: Option<String>,
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct PendingBackupRequest {
@@ -62,6 +82,49 @@ struct PendingBackupRequest {
 
 const BACKUP_METADATA_DIR: &str = "__ai_chat_multiplexer_backup";
 const BACKUP_APP_STATE_ENTRY: &str = "__ai_chat_multiplexer_backup/app-state.json";
+const BACKUP_MANIFEST_ENTRY: &str = "__ai_chat_multiplexer_backup/manifest.json";
+const BACKUP_FORMAT_VERSION: u32 = 1;
+const MAX_BACKUP_METADATA_BYTES: u64 = 10 * 1024 * 1024;
+const MAX_RESTORE_ENTRIES: usize = 10_000;
+const MAX_RESTORE_TOTAL_BYTES: u64 = 4 * 1024 * 1024 * 1024;
+const MAX_RESTORE_FILE_BYTES: u64 = 512 * 1024 * 1024;
+// DEFLATE can legitimately exceed 1,000:1 for repetitive browser profile data.
+// Absolute file/total limits remain the primary ZIP-bomb controls.
+const MAX_RESTORE_COMPRESSION_RATIO: u64 = 1_100;
+const RESTORE_COPY_BUFFER_BYTES: usize = 64 * 1024;
+const MAX_PENDING_BACKUP_REQUEST_BYTES: u64 = 64 * 1024 * 1024;
+const MAX_PENDING_RESTORE_CONFIG_BYTES: u64 = 64 * 1024 * 1024;
+const MAX_STARTUP_RESULTS_BYTES: u64 = 64 * 1024 * 1024;
+const MAX_STARTUP_RESULTS: usize = 4;
+const STALE_RESTORE_STAGING_AGE: Duration = Duration::from_secs(24 * 60 * 60);
+static ACTIVE_RESTORE_CANCEL: Mutex<Option<Arc<AtomicBool>>> = Mutex::new(None);
+static BACKUP_SCHEDULE_LOCK: Mutex<()> = Mutex::new(());
+static STARTUP_RESULTS_LOCK: Mutex<()> = Mutex::new(());
+static TEMP_PATH_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct BackupManifest {
+    format_version: u32,
+    app_version: String,
+    created_at_unix_seconds: u64,
+    profile_ids: Vec<String>,
+}
+
+#[derive(Clone, Copy)]
+struct RestoreLimits {
+    max_entries: usize,
+    max_total_bytes: u64,
+    max_file_bytes: u64,
+    max_compression_ratio: u64,
+}
+
+const RESTORE_LIMITS: RestoreLimits = RestoreLimits {
+    max_entries: MAX_RESTORE_ENTRIES,
+    max_total_bytes: MAX_RESTORE_TOTAL_BYTES,
+    max_file_bytes: MAX_RESTORE_FILE_BYTES,
+    max_compression_ratio: MAX_RESTORE_COMPRESSION_RATIO,
+};
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -121,6 +184,35 @@ fn validate_webview_url(url: &str) -> Result<url::Url, String> {
     }
 }
 
+fn timestamp_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_millis().min(u64::MAX as u128) as u64)
+        .unwrap_or(0)
+}
+
+fn new_window_request(source_label: &str, target: &url::Url) -> NativeNewWindowRequest {
+    let (kind, url, reason) = match target.scheme() {
+        "http" | "https" => (
+            "openTab".to_string(),
+            Some(target.to_string()),
+            target.scheme().to_string(),
+        ),
+        "about" if target.as_str() == "about:blank" => {
+            ("blocked".to_string(), None, "blankPopup".to_string())
+        }
+        _ => ("blocked".to_string(), None, "unsupportedScheme".to_string()),
+    };
+
+    NativeNewWindowRequest {
+        kind,
+        source_label: source_label.to_string(),
+        url,
+        reason,
+        timestamp_ms: timestamp_ms(),
+    }
+}
+
 fn sanitize_path_part(value: &str) -> String {
     let sanitized: String = value
         .chars()
@@ -140,13 +232,30 @@ fn sanitize_path_part(value: &str) -> String {
     }
 }
 
+fn is_safe_profile_session_id(profile_id: &str) -> bool {
+    !profile_id.is_empty()
+        && profile_id.len() <= 120
+        && profile_id.chars().all(|character| {
+            character.is_ascii_alphanumeric() || character == '-' || character == '_'
+        })
+}
+
+fn validate_profile_session_id(profile_id: &str) -> Result<(), String> {
+    if is_safe_profile_session_id(profile_id) {
+        Ok(())
+    } else {
+        Err("Profile session ID không hợp lệ".to_string())
+    }
+}
+
 fn profile_session_directory(app: &tauri::AppHandle, profile_id: &str) -> Result<PathBuf, String> {
+    validate_profile_session_id(profile_id)?;
     let base_dir = app
         .path()
         .app_data_dir()
         .map_err(|error| error.to_string())?
         .join("pane-sessions");
-    let session_dir = base_dir.join(sanitize_path_part(profile_id));
+    let session_dir = base_dir.join(profile_id);
 
     std::fs::create_dir_all(&session_dir).map_err(|error| error.to_string())?;
 
@@ -231,9 +340,16 @@ async fn native_webview_upsert(
     let session_dir = profile_session_directory(&app, &profile_id)?;
     let download_app = app.clone();
     let download_label = label.clone();
+    let popup_app = app.clone();
+    let popup_label = label.clone();
     let webview_builder = WebviewBuilder::new(&label, WebviewUrl::External(parsed_url))
         .data_directory(session_dir)
         .enable_clipboard_access()
+        .on_new_window(move |url, _features| {
+            let request = new_window_request(&popup_label, &url);
+            let _ = popup_app.emit("native-webview-new-window", request);
+            NewWindowResponse::Deny
+        })
         .on_download(move |_webview, event| match event {
             DownloadEvent::Requested { url, destination } => {
                 let suggested = suggested_filename(destination, url.as_str());
@@ -336,10 +452,7 @@ async fn native_webview_upsert(
                 }
             }
             DownloadEvent::Finished { url, path, success } => {
-                eprintln!(
-                    "[download] finished label={} url={} path={:?} success={}",
-                    download_label, url, path, success,
-                );
+                eprintln!("[DOWNLOAD_FINISHED] success={success}");
                 let _ = download_app.emit(
                     "native-webview-download",
                     DownloadProgress::Finished {
@@ -367,12 +480,13 @@ async fn native_webview_upsert(
 
 #[tauri::command]
 async fn delete_profile_session(app: tauri::AppHandle, profile_id: String) -> Result<(), String> {
+    validate_profile_session_id(&profile_id)?;
     let base_dir = app
         .path()
         .app_data_dir()
         .map_err(|error| error.to_string())?
         .join("pane-sessions")
-        .join(sanitize_path_part(&profile_id));
+        .join(&profile_id);
 
     if base_dir.exists() {
         std::fs::remove_dir_all(&base_dir).map_err(|error| error.to_string())?;
@@ -493,6 +607,15 @@ async fn native_webview_tab_status(
     Ok(status)
 }
 
+#[tauri::command]
+async fn diagnostics_runtime_info() -> DiagnosticRuntimeInfo {
+    DiagnosticRuntimeInfo {
+        os: std::env::consts::OS.to_string(),
+        arch: std::env::consts::ARCH.to_string(),
+        webview_version: tauri::webview_version().ok(),
+    }
+}
+
 /// Làm sạch tiêu đề/favicon do trang (không tin cậy) trả về trước khi đưa lên
 /// cửa sổ chính có đặc quyền: loại ký tự điều khiển khỏi title, giới hạn độ dài,
 /// và chỉ giữ favicon là URL http/https.
@@ -536,16 +659,129 @@ fn startup_result_path(root: &Path) -> PathBuf {
         .join(".pane-sessions.startup-results.json")
 }
 
-fn append_startup_result(root: &Path, result: StartupOperationResult) {
+fn read_text_file_bounded(path: &Path, max_bytes: u64) -> Result<String, String> {
+    if is_link_or_reparse_point(path)? {
+        return Err(format!(
+            "File {} là symbolic link hoặc reparse point",
+            path.display()
+        ));
+    }
+    let metadata = std::fs::metadata(path).map_err(|error| error.to_string())?;
+    if metadata.len() > max_bytes {
+        return Err(format!("File {} vượt giới hạn", path.display()));
+    }
+    let mut bytes = Vec::with_capacity(metadata.len().min(max_bytes) as usize);
+    File::open(path)
+        .map_err(|error| error.to_string())?
+        .take(max_bytes + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|error| error.to_string())?;
+    if bytes.len() as u64 > max_bytes {
+        return Err(format!("File {} vượt giới hạn", path.display()));
+    }
+    String::from_utf8(bytes).map_err(|error| error.to_string())
+}
+
+fn write_file_atomic(path: &Path, contents: &[u8]) -> Result<(), String> {
+    if is_link_or_reparse_point(path)? {
+        return Err(format!(
+            "Không ghi đè symbolic link hoặc reparse point {}",
+            path.display()
+        ));
+    }
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+    }
+    let temp_path = unique_output_temp_path(path)?;
+    let result = (|| {
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temp_path)
+            .map_err(|error| error.to_string())?;
+        file.write_all(contents)
+            .map_err(|error| error.to_string())?;
+        file.sync_all().map_err(|error| error.to_string())?;
+        drop(file);
+        finalize_output_file(&temp_path, path)
+    })();
+    if result.is_err() {
+        let _ = std::fs::remove_file(&temp_path);
+    }
+    result
+}
+
+fn write_file_atomic_create_only(path: &Path, contents: &[u8]) -> Result<(), String> {
+    if is_link_or_reparse_point(path)? {
+        return Err(format!(
+            "Không ghi đè symbolic link hoặc reparse point {}",
+            path.display()
+        ));
+    }
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+    }
+    let temp_path = unique_output_temp_path(path)?;
+    let result = (|| {
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temp_path)
+            .map_err(|error| error.to_string())?;
+        file.write_all(contents)
+            .map_err(|error| error.to_string())?;
+        file.sync_all().map_err(|error| error.to_string())?;
+        drop(file);
+        std::fs::hard_link(&temp_path, path).map_err(|error| error.to_string())?;
+        std::fs::remove_file(&temp_path).map_err(|error| error.to_string())
+    })();
+    if result.is_err() {
+        let _ = std::fs::remove_file(&temp_path);
+    }
+    result
+}
+
+fn append_startup_result(root: &Path, result: StartupOperationResult) -> Result<(), String> {
+    let _guard = STARTUP_RESULTS_LOCK
+        .lock()
+        .map_err(|_| "Không thể khóa kết quả startup".to_string())?;
     let path = startup_result_path(root);
-    let mut results = std::fs::read_to_string(&path)
+    let mut results = read_text_file_bounded(&path, MAX_STARTUP_RESULTS_BYTES)
         .ok()
         .and_then(|raw| serde_json::from_str::<Vec<StartupOperationResult>>(&raw).ok())
         .unwrap_or_default();
     results.push(result);
-    if let Ok(json) = serde_json::to_string(&results) {
-        let _ = std::fs::write(path, json);
+    if results.len() > MAX_STARTUP_RESULTS {
+        results.drain(..results.len() - MAX_STARTUP_RESULTS);
     }
+    let mut json = serde_json::to_vec(&results).map_err(|error| error.to_string())?;
+    while json.len() as u64 > MAX_STARTUP_RESULTS_BYTES && results.len() > 1 {
+        results.remove(0);
+        json = serde_json::to_vec(&results).map_err(|error| error.to_string())?;
+    }
+    if json.len() as u64 > MAX_STARTUP_RESULTS_BYTES {
+        return Err("Một kết quả startup vượt giới hạn".to_string());
+    }
+    write_file_atomic(&path, &json)
+}
+
+fn is_link_or_reparse_point(path: &Path) -> Result<bool, String> {
+    let metadata = match std::fs::symlink_metadata(path) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+        Err(error) => return Err(error.to_string()),
+    };
+    if metadata.file_type().is_symlink() {
+        return Ok(true);
+    }
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::fs::MetadataExt;
+        const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
+        Ok(metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0)
+    }
+    #[cfg(not(target_os = "windows"))]
+    Ok(false)
 }
 
 fn add_dir_to_zip<W: Write + std::io::Seek>(
@@ -556,15 +792,23 @@ fn add_dir_to_zip<W: Write + std::io::Seek>(
 ) -> Result<usize, String> {
     let mut file_count = 0;
 
-    for entry in WalkDir::new(src) {
+    let mut entries = WalkDir::new(src).follow_links(false).into_iter();
+    while let Some(entry) = entries.next() {
         let entry = entry.map_err(|error| error.to_string())?;
         let path = entry.path();
+        let file_type = entry.file_type();
+        if is_link_or_reparse_point(path)? {
+            if file_type.is_dir() {
+                entries.skip_current_dir();
+            }
+            continue;
+        }
         let relative = path
             .strip_prefix(base_dir)
             .map_err(|error| error.to_string())?;
         let name = relative.to_string_lossy().replace('\\', "/");
 
-        if path.is_dir() {
+        if file_type.is_dir() {
             if !name.is_empty() {
                 zip.add_directory(format!("{}/", name), options)
                     .map_err(|error| error.to_string())?;
@@ -572,17 +816,14 @@ fn add_dir_to_zip<W: Write + std::io::Seek>(
             continue;
         }
 
-        if name.is_empty() {
+        if name.is_empty() || !file_type.is_file() {
             continue;
         }
 
         zip.start_file(&name, options)
             .map_err(|error| error.to_string())?;
         let mut file = File::open(path).map_err(|error| error.to_string())?;
-        let mut buffer = Vec::new();
-        file.read_to_end(&mut buffer)
-            .map_err(|error| error.to_string())?;
-        zip.write_all(&buffer).map_err(|error| error.to_string())?;
+        std::io::copy(&mut file, zip).map_err(|error| error.to_string())?;
         file_count += 1;
     }
 
@@ -629,13 +870,124 @@ fn write_backup_metadata<W: Write + std::io::Seek>(
     zip: &mut ZipWriter<W>,
     options: SimpleFileOptions,
     config_json: &str,
+    manifest: &BackupManifest,
 ) -> Result<(), String> {
+    if config_json.len() as u64 > MAX_BACKUP_METADATA_BYTES {
+        return Err("App config vượt giới hạn metadata backup".to_string());
+    }
     zip.add_directory(format!("{BACKUP_METADATA_DIR}/"), options)
         .map_err(|error| error.to_string())?;
     zip.start_file(BACKUP_APP_STATE_ENTRY, options)
         .map_err(|error| error.to_string())?;
     zip.write_all(config_json.as_bytes())
+        .map_err(|error| error.to_string())?;
+    zip.start_file(BACKUP_MANIFEST_ENTRY, options)
+        .map_err(|error| error.to_string())?;
+    let manifest_json = serde_json::to_vec(manifest).map_err(|error| error.to_string())?;
+    zip.write_all(&manifest_json)
         .map_err(|error| error.to_string())
+}
+
+fn backup_profile_ids(root: &Path) -> Vec<String> {
+    let mut ids = std::fs::read_dir(root)
+        .into_iter()
+        .flatten()
+        .filter_map(Result::ok)
+        .filter(|entry| entry.file_type().map(|kind| kind.is_dir()).unwrap_or(false))
+        .filter_map(|entry| entry.file_name().to_str().map(str::to_string))
+        .filter(|id| !id.is_empty())
+        .collect::<Vec<_>>();
+    ids.sort();
+    ids.dedup();
+    ids
+}
+
+fn backup_manifest(root: &Path) -> BackupManifest {
+    BackupManifest {
+        format_version: BACKUP_FORMAT_VERSION,
+        app_version: env!("CARGO_PKG_VERSION").to_string(),
+        created_at_unix_seconds: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|duration| duration.as_secs())
+            .unwrap_or(0),
+        profile_ids: backup_profile_ids(root),
+    }
+}
+
+fn unique_sibling_path(output_path: &Path, marker: &str) -> Result<PathBuf, String> {
+    let parent = output_path.parent().unwrap_or_else(|| Path::new("."));
+    let name = output_path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("backup.zip");
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or(0);
+    for _ in 0..1000 {
+        let suffix = TEMP_PATH_COUNTER.fetch_add(1, Ordering::Relaxed);
+        let candidate = parent.join(format!(
+            ".{name}.{marker}-{}-{timestamp}-{suffix}",
+            std::process::id()
+        ));
+        if !candidate.exists() {
+            return Ok(candidate);
+        }
+    }
+    Err(format!(
+        "Không thể tạo file tạm duy nhất bên cạnh {}",
+        output_path.display()
+    ))
+}
+
+fn unique_output_temp_path(output_path: &Path) -> Result<PathBuf, String> {
+    unique_sibling_path(output_path, "partial")
+}
+
+fn finalize_output_file(temp_path: &Path, output_path: &Path) -> Result<(), String> {
+    if !output_path.exists() {
+        return std::fs::rename(temp_path, output_path).map_err(|error| error.to_string());
+    }
+    let output_metadata =
+        std::fs::symlink_metadata(output_path).map_err(|error| error.to_string())?;
+    if !output_metadata.file_type().is_file() || is_link_or_reparse_point(output_path)? {
+        return Err(format!(
+            "Từ chối thay thế output không phải regular file: {}",
+            output_path.display()
+        ));
+    }
+
+    let previous_path = unique_sibling_path(output_path, "previous")?;
+    std::fs::rename(output_path, &previous_path).map_err(|error| error.to_string())?;
+    match std::fs::rename(temp_path, output_path) {
+        Ok(()) => {
+            let _ = std::fs::remove_file(previous_path);
+            Ok(())
+        }
+        Err(error) => {
+            let _ = std::fs::rename(previous_path, output_path);
+            Err(error.to_string())
+        }
+    }
+}
+
+fn validate_backup_output_outside_session_root(
+    root: &Path,
+    output_path: &Path,
+) -> Result<(), String> {
+    let canonical_root = std::fs::canonicalize(root).map_err(|error| error.to_string())?;
+    let output_parent = output_path.parent().unwrap_or_else(|| Path::new("."));
+    let canonical_parent =
+        std::fs::canonicalize(output_parent).map_err(|error| error.to_string())?;
+    let candidate = canonical_parent.join(
+        output_path
+            .file_name()
+            .ok_or_else(|| "Đường dẫn backup không có tên file".to_string())?,
+    );
+    if candidate.starts_with(&canonical_root) {
+        return Err("Không thể lưu backup bên trong thư mục session đang được backup".to_string());
+    }
+    Ok(())
 }
 
 fn backup_sessions_zip_to_strict(
@@ -655,20 +1007,28 @@ fn backup_sessions_zip_to_strict(
             std::fs::create_dir_all(parent).map_err(|error| error.to_string())?;
         }
     }
+    validate_backup_output_outside_session_root(root, output_path)?;
 
-    let file = File::create(output_path).map_err(|error| error.to_string())?;
-    let mut zip = ZipWriter::new(file);
-    let options = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
-    let file_count = add_dir_to_zip(&mut zip, root, root, options)?;
-    write_backup_metadata(&mut zip, options, config_json)?;
-    zip.finish().map_err(|error| error.to_string())?;
+    let temp_path = unique_output_temp_path(output_path)?;
+    let write_result = (|| {
+        let file = File::create(&temp_path).map_err(|error| error.to_string())?;
+        let mut zip = ZipWriter::new(file);
+        let options =
+            SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+        let file_count = add_dir_to_zip(&mut zip, root, root, options)?;
+        write_backup_metadata(&mut zip, options, config_json, &backup_manifest(root))?;
+        zip.finish().map_err(|error| error.to_string())?;
 
-    if file_count == 0 {
-        let _ = std::fs::remove_file(output_path);
-        return Err("Không có file session nào để backup".to_string());
+        if file_count == 0 {
+            return Err("Không có file session nào để backup".to_string());
+        }
+        finalize_output_file(&temp_path, output_path)
+    })();
+
+    if write_result.is_err() {
+        let _ = std::fs::remove_file(&temp_path);
     }
-
-    Ok(())
+    write_result
 }
 #[cfg(test)]
 fn copy_dir_best_effort(src: &Path, dst: &Path) -> Result<usize, String> {
@@ -713,7 +1073,7 @@ fn backup_sessions_zip_to(root: &Path, output_path: &Path) -> Result<(), String>
         }
     }
 
-    let temp_copy = unique_backup_temp_path(root);
+    let temp_copy = unique_backup_temp_path(root)?;
     if temp_copy.exists() {
         let _ = std::fs::remove_dir_all(&temp_copy);
     }
@@ -745,7 +1105,36 @@ fn backup_sessions_zip_to(root: &Path, output_path: &Path) -> Result<(), String>
 
 fn write_backup_config_sidecar(output_path: &Path, config_json: &str) -> Result<(), String> {
     let config_path = config_sidecar_path(output_path);
-    std::fs::write(&config_path, config_json).map_err(|error| error.to_string())
+    let temp_path = unique_output_temp_path(&config_path)?;
+    let result = std::fs::write(&temp_path, config_json)
+        .map_err(|error| error.to_string())
+        .and_then(|_| finalize_output_file(&temp_path, &config_path));
+    if result.is_err() {
+        let _ = std::fs::remove_file(temp_path);
+    }
+    result
+}
+
+fn create_backup_artifacts_with_sidecar<F>(
+    root: &Path,
+    output_path: &Path,
+    config_json: &str,
+    write_sidecar: F,
+) -> Result<(Option<PathBuf>, Vec<String>), String>
+where
+    F: FnOnce(&Path, &str) -> Result<(), String>,
+{
+    backup_sessions_zip_to_strict(root, output_path, config_json)?;
+    let config_path = config_sidecar_path(output_path);
+    match write_sidecar(output_path, config_json) {
+        Ok(()) => Ok((Some(config_path), Vec::new())),
+        Err(error) => Ok((
+            None,
+            vec![format!(
+                "ZIP backup đã hoàn tất nhưng không thể ghi JSON sidecar: {error}"
+            )],
+        )),
+    }
 }
 
 fn schedule_sessions_backup(
@@ -759,7 +1148,13 @@ fn schedule_sessions_backup(
     if !root.is_dir() {
         return Err("Thư mục session không hợp lệ".to_string());
     }
+    if config_json.len() as u64 > MAX_BACKUP_METADATA_BYTES {
+        return Err("App config vượt giới hạn metadata backup".to_string());
+    }
 
+    let _guard = BACKUP_SCHEDULE_LOCK
+        .lock()
+        .map_err(|_| "Không thể khóa lịch backup".to_string())?;
     let request_path = pending_backup_request_path(root);
     if let Some(parent) = request_path.parent() {
         std::fs::create_dir_all(parent).map_err(|error| error.to_string())?;
@@ -769,8 +1164,17 @@ fn schedule_sessions_backup(
         output_path: output_path.to_string_lossy().into_owned(),
         config_json,
     };
-    let json = serde_json::to_string(&request).map_err(|error| error.to_string())?;
-    std::fs::write(request_path, json).map_err(|error| error.to_string())
+    let json = serde_json::to_vec(&request).map_err(|error| error.to_string())?;
+    if json.len() as u64 > MAX_PENDING_BACKUP_REQUEST_BYTES {
+        return Err("Yêu cầu backup vượt giới hạn".to_string());
+    }
+    write_file_atomic_create_only(&request_path, &json).map_err(|error| {
+        if request_path.exists() {
+            "Một backup khác đã được lên lịch và đang chờ restart".to_string()
+        } else {
+            error
+        }
+    })
 }
 
 fn process_pending_sessions_backup(root: &Path) -> Result<(), String> {
@@ -779,50 +1183,76 @@ fn process_pending_sessions_backup(root: &Path) -> Result<(), String> {
         return Ok(());
     }
 
-    let request_json = std::fs::read_to_string(&request_path).map_err(|error| error.to_string())?;
-    let request: PendingBackupRequest =
-        serde_json::from_str(&request_json).map_err(|error| error.to_string())?;
+    let request = (|| {
+        let request_json = read_text_file_bounded(&request_path, MAX_PENDING_BACKUP_REQUEST_BYTES)?;
+        serde_json::from_str::<PendingBackupRequest>(&request_json)
+            .map_err(|error| error.to_string())
+    })();
+    let request = match request {
+        Ok(request) => request,
+        Err(read_error) => {
+            let remove_result = std::fs::remove_file(&request_path);
+            if let Err(remove_error) = remove_result {
+                return Err(format!(
+                    "{read_error}; không thể xóa yêu cầu backup lỗi: {remove_error}"
+                ));
+            }
+            return Err(format!(
+                "Yêu cầu backup không hợp lệ đã được xóa: {read_error}"
+            ));
+        }
+    };
     let output_path = PathBuf::from(&request.output_path);
 
-    let result = backup_sessions_zip_to_strict(root, &output_path, &request.config_json)
-        .and_then(|_| write_backup_config_sidecar(&output_path, &request.config_json));
-    let config_path = config_sidecar_path(&output_path);
+    let result = create_backup_artifacts_with_sidecar(
+        root,
+        &output_path,
+        &request.config_json,
+        write_backup_config_sidecar,
+    );
+    let remove_request_result =
+        std::fs::remove_file(&request_path).map_err(|error| error.to_string());
+    if let Err(error) = remove_request_result {
+        return Err(format!(
+            "Backup đã chạy nhưng không thể xóa yêu cầu pending: {error}"
+        ));
+    }
 
     match result {
-        Ok(()) => {
-            let _ = std::fs::remove_file(&request_path);
-            append_startup_result(
+        Ok((config_path, warnings)) => {
+            if let Err(error) = append_startup_result(
                 root,
                 StartupOperationResult {
                     operation: "backup".to_string(),
                     success: true,
                     message: "Backup hoàn tất".to_string(),
                     zip_path: Some(output_path.to_string_lossy().into_owned()),
-                    config_path: Some(config_path.to_string_lossy().into_owned()),
+                    config_path: config_path.map(|path| path.to_string_lossy().into_owned()),
                     config_json: None,
                     config_restored: None,
-                    warnings: Vec::new(),
+                    warnings,
                 },
-            );
+            ) {
+                eprintln!("[STARTUP_RESULT_WRITE_FAILED] {error}");
+            }
             Ok(())
         }
         Err(error) => {
-            let error_path = output_path.with_extension("backup-error.txt");
-            let _ = std::fs::write(&error_path, &error);
-            let _ = std::fs::remove_file(&request_path);
-            append_startup_result(
+            if let Err(write_error) = append_startup_result(
                 root,
                 StartupOperationResult {
                     operation: "backup".to_string(),
                     success: false,
                     message: error.clone(),
                     zip_path: Some(output_path.to_string_lossy().into_owned()),
-                    config_path: Some(config_path.to_string_lossy().into_owned()),
+                    config_path: None,
                     config_json: None,
                     config_restored: None,
                     warnings: Vec::new(),
                 },
-            );
+            ) {
+                eprintln!("[STARTUP_RESULT_WRITE_FAILED] {write_error}");
+            }
             Err(error)
         }
     }
@@ -848,7 +1278,85 @@ fn pending_restore_config_path(root: &Path) -> PathBuf {
     parent.join(format!(".{name}.pending-restore-config.json"))
 }
 
-fn unique_backup_temp_path(root: &Path) -> PathBuf {
+fn cleanup_restore_staging_paths_older_than(
+    root: &Path,
+    minimum_age: Duration,
+    now: std::time::SystemTime,
+) -> Result<(), String> {
+    let parent = root.parent().unwrap_or_else(|| Path::new("."));
+    if !parent.exists() {
+        return Ok(());
+    }
+    let name = root
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("pane-sessions");
+    let prefix = format!(".{name}.staging-restore");
+    for entry in std::fs::read_dir(parent).map_err(|error| error.to_string())? {
+        let entry = entry.map_err(|error| error.to_string())?;
+        let entry_name = entry.file_name();
+        let Some(entry_name) = entry_name.to_str() else {
+            continue;
+        };
+        let is_owned_name = entry_name == prefix
+            || entry_name
+                .strip_prefix(&format!("{prefix}-"))
+                .is_some_and(|suffix| {
+                    !suffix.is_empty() && suffix.chars().all(|character| character.is_ascii_digit())
+                });
+        let is_old_enough = entry
+            .metadata()
+            .ok()
+            .and_then(|metadata| metadata.modified().ok())
+            .and_then(|modified| now.duration_since(modified).ok())
+            .is_some_and(|age| age >= minimum_age);
+        if is_owned_name && is_old_enough {
+            remove_owned_directory(&entry.path())?;
+        }
+    }
+    Ok(())
+}
+
+fn cleanup_restore_staging_paths(root: &Path) -> Result<(), String> {
+    cleanup_restore_staging_paths_older_than(
+        root,
+        STALE_RESTORE_STAGING_AGE,
+        std::time::SystemTime::now(),
+    )
+}
+
+fn unique_restore_staging_path(root: &Path) -> Result<PathBuf, String> {
+    let parent = root.parent().unwrap_or_else(|| Path::new("."));
+    let name = root
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("pane-sessions");
+    for suffix in 0..1000 {
+        let candidate = parent.join(format!(".{name}.staging-restore-{suffix}"));
+        if !candidate.exists() {
+            return Ok(candidate);
+        }
+    }
+    Err(format!(
+        "Không thể tạo thư mục staging duy nhất bên cạnh {}",
+        root.display()
+    ))
+}
+
+fn remove_owned_directory(path: &Path) -> Result<(), String> {
+    if is_link_or_reparse_point(path)? {
+        return Err(format!(
+            "Từ chối xóa symbolic link hoặc reparse point {}",
+            path.display()
+        ));
+    }
+    if !path.exists() {
+        return Ok(());
+    }
+    std::fs::remove_dir_all(path).map_err(|error| error.to_string())
+}
+
+fn unique_backup_temp_path(root: &Path) -> Result<PathBuf, String> {
     let parent = root.parent().unwrap_or_else(|| Path::new("."));
     let name = root
         .file_name()
@@ -858,11 +1366,14 @@ fn unique_backup_temp_path(root: &Path) -> PathBuf {
     for suffix in 0..1000 {
         let candidate = parent.join(format!(".{name}.previous-{suffix}"));
         if !candidate.exists() {
-            return candidate;
+            return Ok(candidate);
         }
     }
 
-    parent.join(format!(".{name}.previous-fallback"))
+    Err(format!(
+        "Không thể tạo thư mục rollback duy nhất bên cạnh {}",
+        root.display()
+    ))
 }
 
 fn is_backup_metadata_path(path: &Path) -> bool {
@@ -872,20 +1383,64 @@ fn is_backup_metadata_path(path: &Path) -> bool {
         .is_some_and(|first| first == BACKUP_METADATA_DIR)
 }
 
+fn validate_session_archive_path(path: &Path, is_directory: bool) -> Result<(), String> {
+    let mut components = path.components();
+    let profile_id = components
+        .next()
+        .and_then(|component| component.as_os_str().to_str())
+        .ok_or_else(|| "Backup chứa đường dẫn session không hợp lệ".to_string())?;
+
+    if !is_directory && components.next().is_none() {
+        return Err("File session trong backup phải nằm trong thư mục profile".to_string());
+    }
+    validate_profile_session_id(profile_id)?;
+    Ok(())
+}
+
 fn read_embedded_app_state<R: Read + std::io::Seek>(
     archive: &mut ZipArchive<R>,
 ) -> Result<Option<String>, String> {
     match archive.by_name(BACKUP_APP_STATE_ENTRY) {
         Ok(mut entry) => {
+            if entry.size() > MAX_BACKUP_METADATA_BYTES {
+                return Err("App config trong backup vượt giới hạn".to_string());
+            }
             let mut config_json = String::new();
-            entry
+            (&mut entry)
+                .take(MAX_BACKUP_METADATA_BYTES + 1)
                 .read_to_string(&mut config_json)
                 .map_err(|error| error.to_string())?;
+            if config_json.len() as u64 > MAX_BACKUP_METADATA_BYTES {
+                return Err("App config trong backup vượt giới hạn".to_string());
+            }
             Ok(Some(config_json))
         }
         Err(zip::result::ZipError::FileNotFound) => Ok(None),
         Err(error) => Err(error.to_string()),
     }
+}
+
+fn validate_embedded_backup_manifest<R: Read + std::io::Seek>(
+    archive: &mut ZipArchive<R>,
+) -> Result<(), String> {
+    let mut entry = match archive.by_name(BACKUP_MANIFEST_ENTRY) {
+        Ok(entry) => entry,
+        Err(zip::result::ZipError::FileNotFound) => return Ok(()),
+        Err(error) => return Err(error.to_string()),
+    };
+    if entry.size() > MAX_BACKUP_METADATA_BYTES {
+        return Err("Manifest backup vượt giới hạn".to_string());
+    }
+    let manifest: BackupManifest =
+        serde_json::from_reader((&mut entry).take(MAX_BACKUP_METADATA_BYTES + 1))
+            .map_err(|error| format!("Manifest backup không hợp lệ: {error}"))?;
+    if manifest.format_version != BACKUP_FORMAT_VERSION {
+        return Err(format!(
+            "Backup format version {} không được hỗ trợ",
+            manifest.format_version
+        ));
+    }
+    Ok(())
 }
 
 fn read_sidecar_app_state(input_path: &Path) -> Result<Option<(String, PathBuf)>, String> {
@@ -894,6 +1449,13 @@ fn read_sidecar_app_state(input_path: &Path) -> Result<Option<(String, PathBuf)>
         return Ok(None);
     }
 
+    if std::fs::metadata(&config_path)
+        .map_err(|error| error.to_string())?
+        .len()
+        > MAX_BACKUP_METADATA_BYTES
+    {
+        return Err("File config đi kèm vượt giới hạn".to_string());
+    }
     let config_json = std::fs::read_to_string(&config_path).map_err(|error| error.to_string())?;
     Ok(Some((config_json, config_path)))
 }
@@ -995,15 +1557,36 @@ fn build_pending_restore_config<R: Read + std::io::Seek>(
     }
 }
 
-fn write_pending_restore_config(root: &Path, config: &PendingRestoreConfig) -> Result<(), String> {
+fn stage_pending_restore_config(
+    root: &Path,
+    config: &PendingRestoreConfig,
+) -> Result<PathBuf, String> {
     let path = pending_restore_config_path(root);
     let json = serde_json::to_string(config).map_err(|error| error.to_string())?;
-    std::fs::write(path, json).map_err(|error| error.to_string())
+    let temp_path = unique_output_temp_path(&path)?;
+    let result = (|| {
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temp_path)
+            .map_err(|error| error.to_string())?;
+        file.write_all(json.as_bytes())
+            .map_err(|error| error.to_string())?;
+        file.sync_all().map_err(|error| error.to_string())?;
+        Ok::<(), String>(())
+    })();
+    match result {
+        Ok(()) => Ok(temp_path),
+        Err(error) => {
+            let _ = std::fs::remove_file(&temp_path);
+            Err(error)
+        }
+    }
 }
 
-fn take_pending_restore_config(root: &Path) -> PendingRestoreConfig {
+fn read_pending_restore_config(root: &Path) -> PendingRestoreConfig {
     let path = pending_restore_config_path(root);
-    let config = std::fs::read_to_string(&path)
+    read_text_file_bounded(&path, MAX_PENDING_RESTORE_CONFIG_BYTES)
         .ok()
         .and_then(|raw| serde_json::from_str::<PendingRestoreConfig>(&raw).ok())
         .unwrap_or(PendingRestoreConfig {
@@ -1012,27 +1595,94 @@ fn take_pending_restore_config(root: &Path) -> PendingRestoreConfig {
             config_source: None,
             config_error: Some("Không tìm thấy app config đã stage".to_string()),
             warnings: vec!["Không thể restore layout/profile mapping".to_string()],
-        });
-    let _ = std::fs::remove_file(path);
-    config
+        })
+}
+
+fn validate_restore_archive_with_limits<R: Read + std::io::Seek>(
+    archive: &mut ZipArchive<R>,
+    limits: RestoreLimits,
+) -> Result<(), String> {
+    if archive.len() > limits.max_entries {
+        return Err(format!(
+            "Backup có quá nhiều entry (tối đa {})",
+            limits.max_entries
+        ));
+    }
+
+    let mut total = 0_u64;
+    for index in 0..archive.len() {
+        let entry = archive.by_index(index).map_err(|error| error.to_string())?;
+        let enclosed = entry
+            .enclosed_name()
+            .ok_or_else(|| "Backup chứa đường dẫn không an toàn".to_string())?;
+        if enclosed.as_os_str().is_empty() {
+            return Err("Backup chứa entry không hợp lệ".to_string());
+        }
+        if entry.is_dir() {
+            continue;
+        }
+        if entry
+            .unix_mode()
+            .is_some_and(|mode| mode & 0o170000 == 0o120000)
+        {
+            return Err("Backup không được chứa symbolic link".to_string());
+        }
+
+        let size = entry.size();
+        if size > limits.max_file_bytes {
+            return Err(format!(
+                "Một file trong backup vượt giới hạn {} byte",
+                limits.max_file_bytes
+            ));
+        }
+        total = total
+            .checked_add(size)
+            .ok_or_else(|| "Tổng kích thước backup vượt giới hạn".to_string())?;
+        if total > limits.max_total_bytes {
+            return Err(format!(
+                "Tổng dữ liệu giải nén vượt giới hạn {} byte",
+                limits.max_total_bytes
+            ));
+        }
+
+        let compressed = entry.compressed_size();
+        if size > 0
+            && (compressed == 0 || size > compressed.saturating_mul(limits.max_compression_ratio))
+        {
+            return Err(format!(
+                "Backup có compression ratio vượt giới hạn {}:1",
+                limits.max_compression_ratio
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn restore_archive_into_temp<R: Read + std::io::Seek>(
     archive: &mut ZipArchive<R>,
     temp_root: &Path,
+    cancel_requested: &AtomicBool,
 ) -> Result<usize, String> {
+    validate_restore_archive_with_limits(archive, RESTORE_LIMITS)?;
     let mut restored_files = 0;
+    let mut restored_bytes = 0_u64;
+    let mut buffer = [0_u8; RESTORE_COPY_BUFFER_BYTES];
 
     for index in 0..archive.len() {
+        if cancel_requested.load(Ordering::Relaxed) {
+            return Err("Restore đã bị hủy".to_string());
+        }
         let mut entry = archive.by_index(index).map_err(|error| error.to_string())?;
-        let enclosed = match entry.enclosed_name() {
-            Some(path) => path.to_path_buf(),
-            None => continue,
-        };
+        let enclosed = entry
+            .enclosed_name()
+            .ok_or_else(|| "Backup chứa đường dẫn không an toàn".to_string())?
+            .to_path_buf();
 
         if enclosed.as_os_str().is_empty() || is_backup_metadata_path(&enclosed) {
             continue;
         }
+
+        validate_session_archive_path(&enclosed, entry.is_dir())?;
 
         let outpath = temp_root.join(enclosed);
 
@@ -1046,7 +1696,24 @@ fn restore_archive_into_temp<R: Read + std::io::Seek>(
         }
 
         let mut outfile = File::create(&outpath).map_err(|error| error.to_string())?;
-        std::io::copy(&mut entry, &mut outfile).map_err(|error| error.to_string())?;
+        let mut file_bytes = 0_u64;
+        loop {
+            if cancel_requested.load(Ordering::Relaxed) {
+                return Err("Restore đã bị hủy".to_string());
+            }
+            let read = entry.read(&mut buffer).map_err(|error| error.to_string())?;
+            if read == 0 {
+                break;
+            }
+            file_bytes = file_bytes.saturating_add(read as u64);
+            restored_bytes = restored_bytes.saturating_add(read as u64);
+            if file_bytes > MAX_RESTORE_FILE_BYTES || restored_bytes > MAX_RESTORE_TOTAL_BYTES {
+                return Err("Dữ liệu giải nén vượt giới hạn".to_string());
+            }
+            outfile
+                .write_all(&buffer[..read])
+                .map_err(|error| error.to_string())?;
+        }
         restored_files += 1;
     }
 
@@ -1057,29 +1724,33 @@ fn restore_archive_into_temp<R: Read + std::io::Seek>(
     Ok(restored_files)
 }
 
-fn stage_sessions_restore_from_zip(root: &Path, input_path: &Path) -> Result<(), String> {
+fn stage_sessions_restore_from_zip_with_cancel(
+    root: &Path,
+    input_path: &Path,
+    cancel_requested: &AtomicBool,
+) -> Result<(), String> {
     let parent = root
         .parent()
         .ok_or_else(|| "Đường dẫn session không hợp lệ".to_string())?;
     std::fs::create_dir_all(parent).map_err(|error| error.to_string())?;
 
     let pending_root = pending_restore_path(root);
-    let staging_root = parent.join(format!(
-        ".{}.staging-restore",
-        root.file_name()
-            .and_then(|name| name.to_str())
-            .unwrap_or("pane-sessions")
-    ));
-
-    if staging_root.exists() {
-        std::fs::remove_dir_all(&staging_root).map_err(|error| error.to_string())?;
+    let pending_config = pending_restore_config_path(root);
+    if pending_root.exists() || pending_config.exists() {
+        return Err("Một restore đã được stage và đang chờ restart".to_string());
     }
+    cleanup_restore_staging_paths(root)?;
+    let staging_root = unique_restore_staging_path(root)?;
     std::fs::create_dir_all(&staging_root).map_err(|error| error.to_string())?;
 
     let restore_result = (|| {
         let file = File::open(input_path).map_err(|error| error.to_string())?;
         let mut archive = ZipArchive::new(file).map_err(|error| error.to_string())?;
-        restore_archive_into_temp(&mut archive, &staging_root)?;
+        validate_embedded_backup_manifest(&mut archive)?;
+        restore_archive_into_temp(&mut archive, &staging_root, cancel_requested)?;
+        if cancel_requested.load(Ordering::Relaxed) {
+            return Err("Restore đã bị hủy".to_string());
+        }
         let restore_config = build_pending_restore_config(&mut archive, input_path, &staging_root);
         Ok::<PendingRestoreConfig, String>(restore_config)
     })();
@@ -1087,37 +1758,68 @@ fn stage_sessions_restore_from_zip(root: &Path, input_path: &Path) -> Result<(),
     let restore_config = match restore_result {
         Ok(config) => config,
         Err(error) => {
-            let _ = std::fs::remove_dir_all(&staging_root);
-            let _ = std::fs::remove_file(pending_restore_config_path(root));
+            if let Err(cleanup_error) = remove_owned_directory(&staging_root) {
+                return Err(format!("{error}; không thể dọn staging: {cleanup_error}"));
+            }
             return Err(error);
         }
     };
 
-    if pending_root.exists() {
-        std::fs::remove_dir_all(&pending_root).map_err(|error| error.to_string())?;
-    }
-    if let Err(error) = write_pending_restore_config(root, &restore_config) {
-        let _ = std::fs::remove_dir_all(&staging_root);
-        return Err(error);
-    }
+    let staged_config = match stage_pending_restore_config(root, &restore_config) {
+        Ok(path) => path,
+        Err(error) => {
+            if let Err(cleanup_error) = remove_owned_directory(&staging_root) {
+                return Err(format!("{error}; không thể dọn staging: {cleanup_error}"));
+            }
+            return Err(error);
+        }
+    };
     if let Err(error) = std::fs::rename(&staging_root, &pending_root) {
-        let _ = std::fs::remove_file(pending_restore_config_path(root));
-        return Err(error.to_string());
+        let cleanup_error = remove_owned_directory(&staging_root).err();
+        let _ = std::fs::remove_file(&staged_config);
+        return Err(match cleanup_error {
+            Some(cleanup_error) => format!("{error}; không thể dọn staging: {cleanup_error}"),
+            None => error.to_string(),
+        });
+    }
+    if let Err(error) = std::fs::rename(&staged_config, &pending_config) {
+        if std::fs::rename(&pending_root, &staging_root).is_err() {
+            let _ = std::fs::remove_file(&staged_config);
+            return Err(format!(
+                "{error}; rollback không thể gỡ restore đã stage tại {}",
+                pending_root.display()
+            ));
+        }
+        let cleanup_error = remove_owned_directory(&staging_root).err();
+        let _ = std::fs::remove_file(&staged_config);
+        return Err(match cleanup_error {
+            Some(cleanup_error) => format!("{error}; không thể dọn staging: {cleanup_error}"),
+            None => error.to_string(),
+        });
     }
 
     Ok(())
 }
 
-fn apply_staged_sessions_restore(root: &Path) -> Result<(), String> {
+#[cfg(test)]
+fn stage_sessions_restore_from_zip(root: &Path, input_path: &Path) -> Result<(), String> {
+    let cancel_requested = AtomicBool::new(false);
+    stage_sessions_restore_from_zip_with_cancel(root, input_path, &cancel_requested)
+}
+
+fn apply_staged_sessions_restore(root: &Path) -> Result<Vec<String>, String> {
     let pending_root = pending_restore_path(root);
     if !pending_root.exists() {
-        return Ok(());
+        return Ok(Vec::new());
+    }
+    if is_link_or_reparse_point(&pending_root)? {
+        return Err("Restore pending là symbolic link hoặc reparse point".to_string());
+    }
+    if root.exists() && is_link_or_reparse_point(root)? {
+        return Err("Thư mục session hiện tại là symbolic link hoặc reparse point".to_string());
     }
 
-    let previous_root = unique_backup_temp_path(root);
-    if previous_root.exists() {
-        std::fs::remove_dir_all(&previous_root).map_err(|error| error.to_string())?;
-    }
+    let previous_root = unique_backup_temp_path(root)?;
 
     let had_existing_root = root.exists();
     if had_existing_root {
@@ -1125,17 +1827,27 @@ fn apply_staged_sessions_restore(root: &Path) -> Result<(), String> {
     }
 
     if let Err(error) = std::fs::rename(&pending_root, root) {
-        if had_existing_root {
-            let _ = std::fs::rename(&previous_root, root);
+        if had_existing_root && std::fs::rename(&previous_root, root).is_err() {
+            return Err(format!(
+                "{error}; rollback không thể khôi phục session cũ từ {}",
+                previous_root.display()
+            ));
         }
         return Err(error.to_string());
     }
 
+    let mut warnings = Vec::new();
     if had_existing_root {
-        let _ = std::fs::remove_dir_all(&previous_root);
+        if let Err(error) = remove_owned_directory(&previous_root) {
+            eprintln!("[RESTORE_PREVIOUS_CLEANUP_FAILED] {error}");
+            warnings.push(
+                "Restore đã áp dụng nhưng không thể dọn bản session cũ; hãy khởi động lại app trước khi thử lại"
+                    .to_string(),
+            );
+        }
     }
 
-    Ok(())
+    Ok(warnings)
 }
 
 #[tauri::command]
@@ -1180,9 +1892,31 @@ async fn session_startup_results(
     if !path.exists() {
         return Ok(Vec::new());
     }
-    let raw = std::fs::read_to_string(&path).map_err(|error| error.to_string())?;
-    let _ = std::fs::remove_file(&path);
+    let raw = read_text_file_bounded(&path, MAX_STARTUP_RESULTS_BYTES)?;
     serde_json::from_str(&raw).map_err(|error| error.to_string())
+}
+
+fn acknowledge_session_startup_results_for_root(root: &Path) -> Result<(), String> {
+    let result_path = startup_result_path(root);
+    if !result_path.exists() {
+        return Ok(());
+    }
+    let raw = read_text_file_bounded(&result_path, MAX_STARTUP_RESULTS_BYTES)?;
+    let results: Vec<StartupOperationResult> =
+        serde_json::from_str(&raw).map_err(|error| error.to_string())?;
+    let acknowledged_restore = results.iter().any(|result| result.operation == "restore");
+    std::fs::remove_file(&result_path).map_err(|error| error.to_string())?;
+    let restore_config_path = pending_restore_config_path(root);
+    if acknowledged_restore && restore_config_path.exists() {
+        std::fs::remove_file(&restore_config_path).map_err(|error| error.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+async fn acknowledge_session_startup_results(app: tauri::AppHandle) -> Result<(), String> {
+    let root = pane_sessions_root(&app)?;
+    acknowledge_session_startup_results_for_root(&root)
 }
 
 #[tauri::command]
@@ -1208,8 +1942,47 @@ async fn restore_sessions_zip(app: tauri::AppHandle) -> Result<Option<String>, S
     };
 
     let root = pane_sessions_root(&app)?;
-    stage_sessions_restore_from_zip(&root, &input_path)?;
+    let cancel_requested = Arc::new(AtomicBool::new(false));
+    {
+        let mut active = ACTIVE_RESTORE_CANCEL
+            .lock()
+            .map_err(|_| "Không thể khóa trạng thái restore".to_string())?;
+        if active.is_some() {
+            return Err("Một restore khác đang chạy".to_string());
+        }
+        *active = Some(cancel_requested.clone());
+    }
+    let restore_path = input_path.clone();
+    let worker_cancel = cancel_requested.clone();
+    let worker_result = tauri::async_runtime::spawn_blocking(move || {
+        stage_sessions_restore_from_zip_with_cancel(&root, &restore_path, &worker_cancel)
+    })
+    .await;
+    {
+        let mut active = ACTIVE_RESTORE_CANCEL
+            .lock()
+            .map_err(|_| "Không thể mở khóa trạng thái restore".to_string())?;
+        if active
+            .as_ref()
+            .is_some_and(|current| Arc::ptr_eq(current, &cancel_requested))
+        {
+            *active = None;
+        }
+    }
+    let result = worker_result.map_err(|_| "Restore worker bị dừng".to_string())?;
+    result?;
     Ok(Some(input_path.to_string_lossy().into_owned()))
+}
+
+#[tauri::command]
+async fn cancel_restore_sessions() -> Result<(), String> {
+    let active = ACTIVE_RESTORE_CANCEL
+        .lock()
+        .map_err(|_| "Không thể khóa trạng thái restore".to_string())?;
+    if let Some(cancel_requested) = active.as_ref() {
+        cancel_requested.store(true, Ordering::SeqCst);
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -1238,6 +2011,51 @@ mod backup_restore_tests {
             zip.write_all(contents).unwrap();
         }
         zip.finish().unwrap();
+    }
+
+    fn archive_from_entries(
+        entries: &[(&str, &[u8])],
+        compression: zip::CompressionMethod,
+    ) -> ZipArchive<Cursor<Vec<u8>>> {
+        let mut bytes = Cursor::new(Vec::new());
+        {
+            let mut zip = ZipWriter::new(&mut bytes);
+            let options = SimpleFileOptions::default().compression_method(compression);
+            for (name, contents) in entries {
+                zip.start_file(*name, options).unwrap();
+                zip.write_all(contents).unwrap();
+            }
+            zip.finish().unwrap();
+        }
+        bytes.set_position(0);
+        ZipArchive::new(bytes).unwrap()
+    }
+
+    fn test_limits(
+        max_entries: usize,
+        max_total_bytes: u64,
+        max_file_bytes: u64,
+        max_compression_ratio: u64,
+    ) -> RestoreLimits {
+        RestoreLimits {
+            max_entries,
+            max_total_bytes,
+            max_file_bytes,
+            max_compression_ratio,
+        }
+    }
+
+    fn startup_result(message: &str) -> StartupOperationResult {
+        StartupOperationResult {
+            operation: "backup".to_string(),
+            success: true,
+            message: message.to_string(),
+            zip_path: None,
+            config_path: None,
+            config_json: None,
+            config_restored: None,
+            warnings: Vec::new(),
+        }
     }
 
     #[test]
@@ -1307,6 +2125,193 @@ mod backup_restore_tests {
     }
 
     #[test]
+    fn schedule_backup_refuses_to_overwrite_pending_request() {
+        let dir = test_root("backup-pending-conflict");
+        let sessions = dir.join("pane-sessions");
+        let profile = sessions.join("prof-default");
+        let first = dir.join("first.zip");
+        let second = dir.join("second.zip");
+        fs::create_dir_all(&profile).unwrap();
+        fs::write(profile.join("Cookies"), b"cookie-data").unwrap();
+        schedule_sessions_backup(&sessions, &first, "{\"first\":true}".to_string()).unwrap();
+        let request_path = pending_backup_request_path(&sessions);
+        let original = fs::read(&request_path).unwrap();
+
+        let error = schedule_sessions_backup(&sessions, &second, "{\"second\":true}".to_string())
+            .unwrap_err();
+
+        assert!(error.contains("đang chờ restart"));
+        assert_eq!(fs::read(request_path).unwrap(), original);
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn create_only_atomic_write_has_one_complete_winner() {
+        let dir = test_root("atomic-create-only");
+        fs::create_dir_all(&dir).unwrap();
+        let target = Arc::new(dir.join("pending.json"));
+        let barrier = Arc::new(std::sync::Barrier::new(8));
+        let handles = (0..8)
+            .map(|index| {
+                let target = target.clone();
+                let barrier = barrier.clone();
+                std::thread::spawn(move || {
+                    let payload = format!("payload-{index}");
+                    barrier.wait();
+                    (
+                        payload.clone(),
+                        write_file_atomic_create_only(&target, payload.as_bytes()),
+                    )
+                })
+            })
+            .collect::<Vec<_>>();
+        let results = handles
+            .into_iter()
+            .map(|handle| handle.join().unwrap())
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            results.iter().filter(|(_, result)| result.is_ok()).count(),
+            1
+        );
+        let stored = fs::read_to_string(target.as_ref()).unwrap();
+        assert!(results
+            .iter()
+            .any(|(payload, result)| result.is_ok() && payload == &stored));
+        assert_eq!(
+            fs::read_dir(&dir)
+                .unwrap()
+                .filter_map(Result::ok)
+                .filter(|entry| entry.file_name().to_string_lossy().contains("partial"))
+                .count(),
+            0
+        );
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn invalid_pending_backup_request_is_removed_after_read_failure() {
+        let dir = test_root("backup-invalid-pending");
+        let sessions = dir.join("pane-sessions");
+        let request_path = pending_backup_request_path(&sessions);
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(&request_path, b"not-json").unwrap();
+
+        let error = process_pending_sessions_backup(&sessions).unwrap_err();
+
+        assert!(error.contains("expected ident") || error.contains("expected value"));
+        assert!(!request_path.exists());
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn startup_results_are_atomic_and_bounded_to_recent_entries() {
+        let dir = test_root("startup-results-bounded");
+        let sessions = dir.join("pane-sessions");
+        for index in 0..(MAX_STARTUP_RESULTS + 2) {
+            append_startup_result(&sessions, startup_result(&format!("result-{index}"))).unwrap();
+        }
+
+        let raw =
+            read_text_file_bounded(&startup_result_path(&sessions), MAX_STARTUP_RESULTS_BYTES)
+                .unwrap();
+        let results: Vec<StartupOperationResult> = serde_json::from_str(&raw).unwrap();
+
+        assert_eq!(results.len(), MAX_STARTUP_RESULTS);
+        assert_eq!(results.first().unwrap().message, "result-2");
+        assert_eq!(
+            results.last().unwrap().message,
+            format!("result-{}", MAX_STARTUP_RESULTS + 1)
+        );
+        assert_eq!(
+            fs::read_dir(&dir)
+                .unwrap()
+                .filter_map(Result::ok)
+                .filter(|entry| entry.file_name().to_string_lossy().contains("partial"))
+                .count(),
+            0
+        );
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn startup_result_ack_only_consumes_restore_config_for_restore_results() {
+        let dir = test_root("startup-results-ack");
+        let sessions = dir.join("pane-sessions");
+        let config_path = pending_restore_config_path(&sessions);
+        write_file_atomic(&config_path, b"{}").unwrap();
+        append_startup_result(&sessions, startup_result("backup")).unwrap();
+
+        acknowledge_session_startup_results_for_root(&sessions).unwrap();
+
+        assert!(!startup_result_path(&sessions).exists());
+        assert!(config_path.exists());
+
+        let mut restore_result = startup_result("restore");
+        restore_result.operation = "restore".to_string();
+        append_startup_result(&sessions, restore_result).unwrap();
+        acknowledge_session_startup_results_for_root(&sessions).unwrap();
+
+        assert!(!startup_result_path(&sessions).exists());
+        assert!(!config_path.exists());
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn pending_json_limits_allow_escaped_maximum_app_state() {
+        let config_json = "\\\"".repeat((MAX_BACKUP_METADATA_BYTES as usize) / 2);
+        assert_eq!(config_json.len() as u64, MAX_BACKUP_METADATA_BYTES);
+        let request = PendingBackupRequest {
+            output_path: "C:\\backup.zip".to_string(),
+            config_json: config_json.clone(),
+        };
+        let pending_restore = PendingRestoreConfig {
+            config_json: Some(config_json.clone()),
+            config_path: None,
+            config_source: Some("embedded".to_string()),
+            config_error: None,
+            warnings: Vec::new(),
+        };
+        let startup = startup_result(&config_json);
+
+        assert!(
+            serde_json::to_vec(&request).unwrap().len() as u64 <= MAX_PENDING_BACKUP_REQUEST_BYTES
+        );
+        assert!(
+            serde_json::to_vec(&pending_restore).unwrap().len() as u64
+                <= MAX_PENDING_RESTORE_CONFIG_BYTES
+        );
+        assert!(
+            serde_json::to_vec(&vec![startup]).unwrap().len() as u64 <= MAX_STARTUP_RESULTS_BYTES
+        );
+    }
+
+    #[test]
+    fn stale_restore_staging_cleanup_preserves_similarly_named_directory() {
+        let dir = test_root("restore-staging-cleanup");
+        let sessions = dir.join("pane-sessions");
+        let legacy = dir.join(".pane-sessions.staging-restore");
+        let numbered = dir.join(".pane-sessions.staging-restore-7");
+        let unrelated = dir.join(".pane-sessions.staging-restore-user-data");
+        for path in [&legacy, &numbered, &unrelated] {
+            fs::create_dir_all(path).unwrap();
+            fs::write(path.join("marker"), b"data").unwrap();
+        }
+
+        cleanup_restore_staging_paths_older_than(
+            &sessions,
+            Duration::ZERO,
+            std::time::SystemTime::now(),
+        )
+        .unwrap();
+
+        assert!(!legacy.exists());
+        assert!(!numbered.exists());
+        assert!(unrelated.join("marker").exists());
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
     fn startup_process_pending_backup_creates_zip_and_config() {
         let dir = test_root("backup-process");
         let sessions = dir.join("pane-sessions");
@@ -1325,6 +2330,11 @@ mod backup_restore_tests {
         );
         let file = File::open(&output).unwrap();
         let mut archive = ZipArchive::new(file).unwrap();
+        let manifest: BackupManifest =
+            serde_json::from_reader(archive.by_name(BACKUP_MANIFEST_ENTRY).unwrap()).unwrap();
+        assert_eq!(manifest.format_version, BACKUP_FORMAT_VERSION);
+        assert_eq!(manifest.app_version, env!("CARGO_PKG_VERSION"));
+        assert_eq!(manifest.profile_ids, vec!["prof-default"]);
         let mut metadata = archive.by_name(BACKUP_APP_STATE_ENTRY).unwrap();
         let mut metadata_contents = String::new();
         metadata.read_to_string(&mut metadata_contents).unwrap();
@@ -1338,6 +2348,38 @@ mod backup_restore_tests {
     }
 
     #[test]
+    fn backup_keeps_valid_self_contained_zip_when_sidecar_write_fails() {
+        let dir = test_root("backup-sidecar-failure");
+        let sessions = dir.join("pane-sessions");
+        let profile = sessions.join("prof-default");
+        let output = dir.join("sessions.zip");
+        fs::create_dir_all(&profile).unwrap();
+        fs::write(profile.join("Cookies"), b"cookie-data").unwrap();
+
+        let (config_path, warnings) = create_backup_artifacts_with_sidecar(
+            &sessions,
+            &output,
+            "{\"workspaces\":[1]}",
+            |_output, _config| Err("simulated sidecar failure".to_string()),
+        )
+        .unwrap();
+
+        assert!(output.exists());
+        assert!(config_path.is_none());
+        assert_eq!(warnings.len(), 1);
+        assert!(warnings[0].contains("simulated sidecar failure"));
+        let mut archive = ZipArchive::new(File::open(&output).unwrap()).unwrap();
+        let mut embedded = String::new();
+        archive
+            .by_name(BACKUP_APP_STATE_ENTRY)
+            .unwrap()
+            .read_to_string(&mut embedded)
+            .unwrap();
+        assert_eq!(embedded, "{\"workspaces\":[1]}");
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
     fn stage_restore_rejects_zip_without_valid_session_files() {
         let dir = test_root("restore-empty");
         let sessions = dir.join("pane-sessions");
@@ -1347,6 +2389,36 @@ mod backup_restore_tests {
         let error = stage_sessions_restore_from_zip(&sessions, &input).unwrap_err();
 
         assert!(error.contains("không chứa session hợp lệ"));
+        assert!(!sessions.exists());
+        assert!(!pending_restore_path(&sessions).exists());
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn stage_restore_rejects_files_outside_a_profile_directory() {
+        let dir = test_root("restore-root-file");
+        let sessions = dir.join("pane-sessions");
+        let input = dir.join("not-a-session-backup.zip");
+        create_zip(&input, &[("root-file.txt", b"not a browser session")]);
+
+        let error = stage_sessions_restore_from_zip(&sessions, &input).unwrap_err();
+
+        assert!(error.contains("thư mục profile"));
+        assert!(!sessions.exists());
+        assert!(!pending_restore_path(&sessions).exists());
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn stage_restore_rejects_unsafe_profile_directory_ids() {
+        let dir = test_root("restore-unsafe-profile-id");
+        let sessions = dir.join("pane-sessions");
+        let input = dir.join("unsafe-profile.zip");
+        create_zip(&input, &[("profile@work/Cookies", b"cookie-data")]);
+
+        let error = stage_sessions_restore_from_zip(&sessions, &input).unwrap_err();
+
+        assert!(error.contains("Profile session ID không hợp lệ"));
         assert!(!sessions.exists());
         assert!(!pending_restore_path(&sessions).exists());
         let _ = fs::remove_dir_all(dir);
@@ -1380,13 +2452,45 @@ mod backup_restore_tests {
         assert!(!pending_restore_path(&sessions)
             .join(BACKUP_METADATA_DIR)
             .exists());
-        let pending_config = take_pending_restore_config(&sessions);
+        let pending_config = read_pending_restore_config(&sessions);
         assert_eq!(pending_config.config_source.as_deref(), Some("embedded"));
         assert_eq!(
             pending_config.config_json.as_deref(),
             Some(std::str::from_utf8(config).unwrap())
         );
         assert!(pending_config.warnings.is_empty());
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn stage_restore_rejects_unknown_or_malformed_backup_manifest() {
+        let dir = test_root("restore-manifest-validation");
+        let sessions = dir.join("pane-sessions");
+        let future = dir.join("future.zip");
+        let malformed = dir.join("malformed.zip");
+        let future_manifest = br#"{"formatVersion":999,"appVersion":"999.0.0","createdAtUnixSeconds":0,"profileIds":[]}"#;
+        create_zip(
+            &future,
+            &[
+                (BACKUP_MANIFEST_ENTRY, future_manifest),
+                ("profile/Cookies", b"future"),
+            ],
+        );
+        create_zip(
+            &malformed,
+            &[
+                (BACKUP_MANIFEST_ENTRY, b"not-json"),
+                ("profile/Cookies", b"malformed"),
+            ],
+        );
+
+        let future_error = stage_sessions_restore_from_zip(&sessions, &future).unwrap_err();
+        assert!(future_error.contains("version 999"));
+        let malformed_error = stage_sessions_restore_from_zip(&sessions, &malformed).unwrap_err();
+        assert!(malformed_error.contains("Manifest backup không hợp lệ"));
+        assert!(!sessions.exists());
+        assert!(!pending_restore_path(&sessions).exists());
+        assert!(!dir.join(".pane-sessions.staging-restore").exists());
         let _ = fs::remove_dir_all(dir);
     }
 
@@ -1402,7 +2506,7 @@ mod backup_restore_tests {
 
         stage_sessions_restore_from_zip(&sessions, &input).unwrap();
 
-        let pending_config = take_pending_restore_config(&sessions);
+        let pending_config = read_pending_restore_config(&sessions);
         assert_eq!(pending_config.config_source.as_deref(), Some("sidecar"));
         assert_eq!(
             pending_config.config_path.as_deref(),
@@ -1441,6 +2545,39 @@ mod backup_restore_tests {
     }
 
     #[test]
+    fn stage_restore_refuses_to_replace_an_existing_pending_restore() {
+        let dir = test_root("restore-pending-conflict");
+        let sessions = dir.join("pane-sessions");
+        let first = dir.join("first.zip");
+        let second = dir.join("second.zip");
+        create_zip(&first, &[("first-profile/Cookies", b"first")]);
+        create_zip(&second, &[("second-profile/Cookies", b"second")]);
+
+        stage_sessions_restore_from_zip(&sessions, &first).unwrap();
+        let pending_config = pending_restore_config_path(&sessions);
+        let first_config = fs::read(&pending_config).unwrap();
+
+        let error = stage_sessions_restore_from_zip(&sessions, &second).unwrap_err();
+
+        assert!(error.contains("đang chờ restart"));
+        assert_eq!(
+            fs::read(
+                pending_restore_path(&sessions)
+                    .join("first-profile")
+                    .join("Cookies")
+            )
+            .unwrap(),
+            b"first"
+        );
+        assert!(!pending_restore_path(&sessions)
+            .join("second-profile")
+            .exists());
+        assert_eq!(fs::read(pending_config).unwrap(), first_config);
+        assert!(!dir.join(".pane-sessions.staging-restore").exists());
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
     fn startup_apply_replaces_existing_sessions_cleanly() {
         let dir = test_root("restore-apply");
         let sessions = dir.join("pane-sessions");
@@ -1450,7 +2587,7 @@ mod backup_restore_tests {
         fs::create_dir_all(pending.join("new-profile")).unwrap();
         fs::write(pending.join("new-profile").join("Cookies"), b"new").unwrap();
 
-        apply_staged_sessions_restore(&sessions).unwrap();
+        assert!(apply_staged_sessions_restore(&sessions).unwrap().is_empty());
 
         assert!(!sessions.join("old-profile").exists());
         assert_eq!(
@@ -1458,6 +2595,45 @@ mod backup_restore_tests {
             b"new"
         );
         assert!(!pending.exists());
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn interrupted_startup_keeps_restore_config_replayable_after_session_swap() {
+        let dir = test_root("restore-interrupted-startup");
+        let sessions = dir.join("pane-sessions");
+        let pending = pending_restore_path(&sessions);
+        let config_path = pending_restore_config_path(&sessions);
+        fs::create_dir_all(sessions.join("old-profile")).unwrap();
+        fs::write(sessions.join("old-profile").join("Cookies"), b"old").unwrap();
+        fs::create_dir_all(pending.join("new-profile")).unwrap();
+        fs::write(pending.join("new-profile").join("Cookies"), b"new").unwrap();
+        let config = PendingRestoreConfig {
+            config_json: Some("{\"workspaces\":[1]}".to_string()),
+            config_path: None,
+            config_source: Some("embedded".to_string()),
+            config_error: None,
+            warnings: Vec::new(),
+        };
+        write_file_atomic(&config_path, &serde_json::to_vec(&config).unwrap()).unwrap();
+
+        apply_staged_sessions_restore(&sessions).unwrap();
+
+        assert!(!pending.exists());
+        assert!(config_path.exists());
+        assert_eq!(
+            read_pending_restore_config(&sessions)
+                .config_json
+                .as_deref(),
+            Some("{\"workspaces\":[1]}")
+        );
+        assert_eq!(
+            read_pending_restore_config(&sessions)
+                .config_json
+                .as_deref(),
+            Some("{\"workspaces\":[1]}")
+        );
+        assert!(config_path.exists());
         let _ = fs::remove_dir_all(dir);
     }
 
@@ -1473,9 +2649,10 @@ mod backup_restore_tests {
         let temp = dir.join("temp");
         fs::create_dir_all(&temp).unwrap();
 
-        let error = restore_archive_into_temp(&mut archive, &temp).unwrap_err();
+        let cancel = AtomicBool::new(false);
+        let error = restore_archive_into_temp(&mut archive, &temp, &cancel).unwrap_err();
 
-        assert!(error.contains("không chứa session hợp lệ"));
+        assert!(error.contains("đường dẫn không an toàn"));
         assert!(!dir.join("outside").exists());
         assert!(!sessions.exists());
         let _ = fs::remove_dir_all(dir);
@@ -1491,7 +2668,8 @@ mod backup_restore_tests {
         let temp = dir.join("temp");
         fs::create_dir_all(&temp).unwrap();
 
-        let count = restore_archive_into_temp(&mut archive, &temp).unwrap();
+        let cancel = AtomicBool::new(false);
+        let count = restore_archive_into_temp(&mut archive, &temp, &cancel).unwrap();
 
         assert_eq!(count, 1);
         assert_eq!(
@@ -1505,6 +2683,198 @@ mod backup_restore_tests {
     fn restore_empty_in_memory_zip_is_rejected() {
         let cursor = Cursor::new(Vec::<u8>::new());
         assert!(ZipArchive::new(cursor).is_err());
+    }
+
+    #[test]
+    fn restore_rejects_entry_count_before_extracting() {
+        let mut archive = archive_from_entries(
+            &[("profile/one", b"1"), ("profile/two", b"2")],
+            zip::CompressionMethod::Stored,
+        );
+        let error =
+            validate_restore_archive_with_limits(&mut archive, test_limits(1, 100, 100, 200))
+                .unwrap_err();
+        assert!(error.contains("quá nhiều entry"));
+    }
+
+    #[test]
+    fn restore_rejects_single_file_and_total_size_limits() {
+        let entries = [("profile/one", b"12345".as_slice())];
+        let mut archive = archive_from_entries(&entries, zip::CompressionMethod::Stored);
+        let error =
+            validate_restore_archive_with_limits(&mut archive, test_limits(10, 100, 4, 200))
+                .unwrap_err();
+        assert!(error.contains("Một file"));
+
+        let mut archive = archive_from_entries(
+            &[("profile/one", b"123"), ("profile/two", b"456")],
+            zip::CompressionMethod::Stored,
+        );
+        let error =
+            validate_restore_archive_with_limits(&mut archive, test_limits(10, 5, 100, 200))
+                .unwrap_err();
+        assert!(error.contains("Tổng dữ liệu"));
+    }
+
+    #[test]
+    fn restore_rejects_excessive_compression_ratio() {
+        let payload = vec![b'A'; 32 * 1024];
+        let mut archive = archive_from_entries(
+            &[("profile/compressed", payload.as_slice())],
+            zip::CompressionMethod::Deflated,
+        );
+        let error = validate_restore_archive_with_limits(
+            &mut archive,
+            test_limits(10, 100_000, 100_000, 2),
+        )
+        .unwrap_err();
+        assert!(error.contains("compression ratio"));
+    }
+
+    #[test]
+    fn cancelled_restore_cleans_staging_and_preserves_live_sessions() {
+        let dir = test_root("restore-cancelled");
+        let sessions = dir.join("pane-sessions");
+        fs::create_dir_all(sessions.join("old-profile")).unwrap();
+        fs::write(sessions.join("old-profile").join("Cookies"), b"old").unwrap();
+        let input = dir.join("backup.zip");
+        create_zip(&input, &[("new-profile/Cookies", b"new")]);
+        let cancel = AtomicBool::new(true);
+
+        let error =
+            stage_sessions_restore_from_zip_with_cancel(&sessions, &input, &cancel).unwrap_err();
+
+        assert!(error.contains("bị hủy"));
+        assert_eq!(
+            fs::read(sessions.join("old-profile").join("Cookies")).unwrap(),
+            b"old"
+        );
+        assert!(!pending_restore_path(&sessions).exists());
+        assert!(!dir.join(".pane-sessions.staging-restore").exists());
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn backup_failure_does_not_replace_existing_output_or_leave_partial_file() {
+        let dir = test_root("backup-atomic-failure");
+        let sessions = dir.join("pane-sessions");
+        let output = dir.join("sessions.zip");
+        fs::create_dir_all(&sessions).unwrap();
+        fs::write(&output, b"existing").unwrap();
+
+        let error = backup_sessions_zip_to_strict(&sessions, &output, "{}").unwrap_err();
+
+        assert!(error.contains("Không có file session"));
+        assert_eq!(fs::read(&output).unwrap(), b"existing");
+        let partial_count = fs::read_dir(&dir)
+            .unwrap()
+            .filter_map(Result::ok)
+            .filter(|entry| entry.file_name().to_string_lossy().contains("partial"))
+            .count();
+        assert_eq!(partial_count, 0);
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn backup_rejects_output_inside_live_session_tree() {
+        let dir = test_root("backup-inside-session-root");
+        let sessions = dir.join("pane-sessions");
+        let profile = sessions.join("prof-default");
+        let output = profile.join("self-backup.zip");
+        fs::create_dir_all(&profile).unwrap();
+        fs::write(profile.join("Cookies"), b"cookie-data").unwrap();
+
+        let error =
+            backup_sessions_zip_to_strict(&sessions, &output, "{\"workspaces\":[]}").unwrap_err();
+
+        assert!(error.contains("bên trong thư mục session"));
+        assert!(!output.exists());
+        assert_eq!(
+            fs::read_dir(&profile)
+                .unwrap()
+                .filter_map(Result::ok)
+                .filter(|entry| entry.file_name().to_string_lossy().contains("partial"))
+                .count(),
+            0
+        );
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn backup_overwrite_preserves_unrelated_previous_backup_file() {
+        let dir = test_root("backup-unrelated-previous");
+        let sessions = dir.join("pane-sessions");
+        let profile = sessions.join("prof-default");
+        let output = dir.join("sessions.zip");
+        let unrelated = output.with_extension("previous-backup");
+        fs::create_dir_all(&profile).unwrap();
+        fs::write(profile.join("Cookies"), b"new").unwrap();
+        fs::write(&output, b"old").unwrap();
+        fs::write(&unrelated, b"unrelated").unwrap();
+
+        backup_sessions_zip_to_strict(&sessions, &output, "{\"workspaces\":[1]}").unwrap();
+
+        assert_eq!(fs::read(&unrelated).unwrap(), b"unrelated");
+        let mut archive = ZipArchive::new(File::open(&output).unwrap()).unwrap();
+        let mut restored = Vec::new();
+        archive
+            .by_name("prof-default/Cookies")
+            .unwrap()
+            .read_to_end(&mut restored)
+            .unwrap();
+        assert_eq!(restored, b"new");
+        assert_eq!(
+            fs::read_dir(&dir)
+                .unwrap()
+                .filter_map(Result::ok)
+                .filter(|entry| {
+                    entry
+                        .file_name()
+                        .to_string_lossy()
+                        .starts_with(".sessions.zip.previous-")
+                })
+                .count(),
+            0
+        );
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn app_generated_backup_is_accepted_by_its_restore_limits() {
+        let dir = test_root("backup-roundtrip-limits");
+        let sessions = dir.join("pane-sessions");
+        let profile = sessions.join("prof-default");
+        let output = dir.join("sessions.zip");
+        fs::create_dir_all(&profile).unwrap();
+        fs::write(profile.join("HighlyCompressible"), vec![b'A'; 64 * 1024]).unwrap();
+
+        backup_sessions_zip_to_strict(&sessions, &output, "{\"workspaces\":[]}").unwrap();
+        let mut archive = ZipArchive::new(File::open(&output).unwrap()).unwrap();
+
+        validate_restore_archive_with_limits(&mut archive, RESTORE_LIMITS).unwrap();
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn backup_skips_symbolic_links_outside_the_session_root() {
+        use std::os::unix::fs::symlink;
+
+        let dir = test_root("backup-symlink");
+        let sessions = dir.join("pane-sessions");
+        let profile = sessions.join("prof-default");
+        let output = dir.join("sessions.zip");
+        let outside = dir.join("outside-secret");
+        fs::create_dir_all(&profile).unwrap();
+        fs::write(profile.join("Cookies"), b"cookie").unwrap();
+        fs::write(&outside, b"outside").unwrap();
+        symlink(&outside, profile.join("linked-secret")).unwrap();
+
+        backup_sessions_zip_to_strict(&sessions, &output, "{\"workspaces\":[1]}").unwrap();
+
+        let mut archive = ZipArchive::new(File::open(&output).unwrap()).unwrap();
+        assert!(archive.by_name("prof-default/linked-secret").is_err());
+        let _ = fs::remove_dir_all(dir);
     }
 }
 
@@ -1563,35 +2933,23 @@ pub fn run() {
     builder
         .setup(|app| {
             let root = pane_sessions_root(app.handle()).map_err(std::io::Error::other)?;
-            if let Err(error) = process_pending_sessions_backup(&root) {
-                eprintln!("[backup] pending startup backup failed: {error}");
+            if let Err(error) = cleanup_restore_staging_paths(&root) {
+                eprintln!("[RESTORE_STAGING_CLEANUP_FAILED] {error}");
             }
+            if let Err(error) = process_pending_sessions_backup(&root) {
+                eprintln!("[FULL_BACKUP_STARTUP_FAILED] {error}");
+            }
+            let mut staged_restore_applied = false;
+            let mut restore_cleanup_warnings = Vec::new();
             if pending_restore_path(&root).exists() {
                 match apply_staged_sessions_restore(&root) {
-                    Ok(()) => {
-                        let restore_config = take_pending_restore_config(&root);
-                        let mut warnings = restore_config.warnings;
-                        if let Some(error) = &restore_config.config_error {
-                            warnings.push(error.clone());
-                        }
-                        let config_restored = restore_config.config_json.is_some();
-                        append_startup_result(
-                            &root,
-                            StartupOperationResult {
-                                operation: "restore".to_string(),
-                                success: true,
-                                message: "Restore hoàn tất".to_string(),
-                                zip_path: None,
-                                config_path: restore_config.config_path,
-                                config_json: restore_config.config_json,
-                                config_restored: Some(config_restored),
-                                warnings,
-                            },
-                        )
+                    Ok(cleanup_warnings) => {
+                        staged_restore_applied = true;
+                        restore_cleanup_warnings = cleanup_warnings;
                     }
                     Err(error) => {
-                        eprintln!("[restore] pending startup restore failed: {error}");
-                        append_startup_result(
+                        eprintln!("[FULL_RESTORE_STARTUP_FAILED]");
+                        if let Err(write_error) = append_startup_result(
                             &root,
                             StartupOperationResult {
                                 operation: "restore".to_string(),
@@ -1603,8 +2961,43 @@ pub fn run() {
                                 config_restored: Some(false),
                                 warnings: Vec::new(),
                             },
-                        );
+                        ) {
+                            eprintln!("[STARTUP_RESULT_WRITE_FAILED] {write_error}");
+                        }
                     }
+                }
+            }
+            let restore_config_path = pending_restore_config_path(&root);
+            if staged_restore_applied
+                || (restore_config_path.exists() && !pending_restore_path(&root).exists())
+            {
+                let restore_config = read_pending_restore_config(&root);
+                let mut warnings = restore_config.warnings;
+                warnings.extend(restore_cleanup_warnings);
+                if !staged_restore_applied {
+                    warnings.push(
+                        "Khôi phục app state tiếp tục sau lần khởi động trước bị gián đoạn"
+                            .to_string(),
+                    );
+                }
+                if let Some(error) = &restore_config.config_error {
+                    warnings.push(error.clone());
+                }
+                let config_restored = restore_config.config_json.is_some();
+                if let Err(error) = append_startup_result(
+                    &root,
+                    StartupOperationResult {
+                        operation: "restore".to_string(),
+                        success: true,
+                        message: "Restore hoàn tất".to_string(),
+                        zip_path: None,
+                        config_path: restore_config.config_path,
+                        config_json: restore_config.config_json,
+                        config_restored: Some(config_restored),
+                        warnings,
+                    },
+                ) {
+                    eprintln!("[STARTUP_RESULT_WRITE_FAILED] {error}");
                 }
             }
             Ok(())
@@ -1616,10 +3009,13 @@ pub fn run() {
             native_webview_navigate,
             native_webview_load_url,
             native_webview_tab_status,
+            diagnostics_runtime_info,
             delete_profile_session,
             backup_sessions_zip,
             restore_sessions_zip,
+            cancel_restore_sessions,
             session_startup_results,
+            acknowledge_session_startup_results,
             reveal_path_in_folder,
             quit_app
         ])
@@ -1652,6 +3048,16 @@ mod security_tests {
         assert!(!is_safe_webview_label("tab t1"));
         assert!(validate_webview_label("main").is_err());
         assert!(validate_webview_label("tab-t1").is_ok());
+    }
+
+    #[test]
+    fn profile_session_id_validator_prevents_directory_aliases() {
+        assert!(validate_profile_session_id("prof-default").is_ok());
+        assert!(validate_profile_session_id("prof_Work-9").is_ok());
+        assert!(validate_profile_session_id("").is_err());
+        assert!(validate_profile_session_id("profile@work").is_err());
+        assert!(validate_profile_session_id("../profile").is_err());
+        assert!(validate_profile_session_id(&"a".repeat(121)).is_err());
     }
 
     #[test]
@@ -1721,5 +3127,28 @@ mod security_tests {
         assert_eq!(parts[1].len(), 2);
         assert_eq!(parts[2].len(), 2);
         assert!(parts.iter().all(|p| p.chars().all(|c| c.is_ascii_digit())));
+    }
+
+    #[test]
+    fn new_window_http_request_routes_without_losing_query() {
+        let target = url::Url::parse("https://example.com/oauth?state=secret#return").unwrap();
+        let request = new_window_request("tab-t1", &target);
+        assert_eq!(request.kind, "openTab");
+        assert_eq!(request.source_label, "tab-t1");
+        assert_eq!(request.reason, "https");
+        assert_eq!(request.url.as_deref(), Some(target.as_str()));
+    }
+
+    #[test]
+    fn new_window_blank_and_custom_schemes_are_blocked_without_url_payload() {
+        for (raw, expected_reason) in [
+            ("about:blank", "blankPopup"),
+            ("mailto:test@example.com", "unsupportedScheme"),
+        ] {
+            let request = new_window_request("tab-t1", &url::Url::parse(raw).unwrap());
+            assert_eq!(request.kind, "blocked");
+            assert_eq!(request.reason, expected_reason);
+            assert!(request.url.is_none());
+        }
     }
 }

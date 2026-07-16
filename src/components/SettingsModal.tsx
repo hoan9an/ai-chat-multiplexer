@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import {
   IconCheck,
   IconDownload,
@@ -28,6 +29,10 @@ export type SettingsModalProps = {
   onImportConfig: () => void;
   onExportFullBackup: () => void;
   onRestoreFullBackup: () => void;
+  onExportSupportBundle: () => void;
+  onOpenSupportIssue: () => void;
+  onOpenKnownIssues: () => void;
+  onShowOnboarding: () => void;
 };
 
 export function SettingsModal({
@@ -44,8 +49,17 @@ export function SettingsModal({
   onImportConfig,
   onExportFullBackup,
   onRestoreFullBackup,
+  onExportSupportBundle,
+  onOpenSupportIssue,
+  onOpenKnownIssues,
+  onShowOnboarding,
 }: SettingsModalProps) {
   const { t, lang, setLang } = useTranslation();
+  const [fullBackupConsent, setFullBackupConsent] = useState(false);
+
+  useEffect(() => {
+    if (!open) setFullBackupConsent(false);
+  }, [open]);
 
   if (!open) return null;
 
@@ -210,12 +224,21 @@ export function SettingsModal({
               <IconUpload size={12} /> {t("backup.importConfig")}
             </button>
           </div>
+          <label className="settings-consent">
+            <input
+              type="checkbox"
+              checked={fullBackupConsent}
+              onChange={(event) => setFullBackupConsent(event.target.checked)}
+              disabled={!isTauriRuntime()}
+            />
+            <span>{t("backup.unencryptedConsent")}</span>
+          </label>
           <div className="settings-actions">
             <button
               type="button"
               className="modal-btn"
               onClick={onExportFullBackup}
-              disabled={backupBusy !== "idle" || !isTauriRuntime()}
+              disabled={backupBusy !== "idle" || !isTauriRuntime() || !fullBackupConsent}
               title={!isTauriRuntime() ? t("backup.desktopOnly") : undefined}
             >
               <IconDownload size={12} /> {t("backup.fullBackup")}
@@ -228,6 +251,27 @@ export function SettingsModal({
               title={!isTauriRuntime() ? t("backup.desktopOnly") : undefined}
             >
               <IconUpload size={12} /> {t("backup.restoreBackup")}
+            </button>
+          </div>
+        </section>
+
+        <section className="settings-section">
+          <h4 className="settings-section-title">{t("diagnostics.title")}</h4>
+          <p className="settings-help">{t("diagnostics.help")}</p>
+          <div className="settings-actions">
+            <button type="button" className="modal-btn" onClick={onExportSupportBundle}>
+              <IconDownload size={12} /> {t("diagnostics.export")}
+            </button>
+            <button type="button" className="modal-btn" onClick={onOpenSupportIssue}>
+              <IconExternal size={12} /> {t("support.reportIssue")}
+            </button>
+          </div>
+          <div className="settings-support-links">
+            <button type="button" className="settings-link-button" onClick={onOpenKnownIssues}>
+              {t("support.knownIssues")}
+            </button>
+            <button type="button" className="settings-link-button" onClick={onShowOnboarding}>
+              {t("onboarding.showAgain")}
             </button>
           </div>
         </section>

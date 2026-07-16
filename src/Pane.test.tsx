@@ -284,6 +284,7 @@ describe("Pane", () => {
 
     expect(frame.src).toContain("/newtab.html");
     expect(new URL(frame.src).searchParams.get("lang")).toBe("en");
+    expect(frame.getAttribute("sandbox")).toBe("allow-scripts");
   });
 
   it("uses a loading placeholder instead of iframe-loading external URLs in Tauri", () => {
@@ -330,7 +331,7 @@ describe("Pane", () => {
 
     window.dispatchEvent(
       new MessageEvent("message", {
-        origin: window.location.origin,
+        origin: "null",
         source: frame.contentWindow,
         data: { type: "ai-chat-multiplexer:navigate", url: "https://claude.ai" },
       }),
@@ -365,6 +366,28 @@ describe("Pane", () => {
       new MessageEvent("message", {
         origin: "https://evil.example",
         source: frame.contentWindow,
+        data: { type: "ai-chat-multiplexer:navigate", url: "https://claude.ai" },
+      }),
+    );
+
+    expect(updateActivePane).not.toHaveBeenCalled();
+  });
+
+  it("ignores opaque-origin new-tab messages from a different window", () => {
+    const newTabUrl = getNewTabUrl();
+    const pane = makePane({
+      tabs: [
+        { id: "t1", title: "New Tab", url: newTabUrl, loadedUrl: newTabUrl },
+      ],
+      activeTabId: "t1",
+    });
+    const updateActivePane = vi.fn();
+    renderHarness({ pane, updateActivePane });
+
+    window.dispatchEvent(
+      new MessageEvent("message", {
+        origin: "null",
+        source: window,
         data: { type: "ai-chat-multiplexer:navigate", url: "https://claude.ai" },
       }),
     );

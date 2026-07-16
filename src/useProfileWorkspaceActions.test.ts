@@ -324,11 +324,11 @@ describe("useProfileWorkspaceActions", () => {
     invokeSpy.mockResolvedValue(undefined);
     const profiles = [
       { id: "prof-default", name: "Default" },
-      { id: "prof@special", name: "Special" },
+      { id: "prof-special", name: "Special" },
     ];
     const initial = makeState([makeWorkspace("ws1", [])], "ws1", profiles);
     const h = setupHook(initial);
-    act(() => h.actions.deleteProfile("prof@special"));
+    act(() => h.actions.deleteProfile("prof-special"));
     act(() => h.capturedConfirm!.onConfirm());
     expect(invokeSpy).toHaveBeenCalledWith("delete_profile_session", {
       profileId: "prof-special",

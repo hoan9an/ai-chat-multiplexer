@@ -26,10 +26,27 @@ function serializeState(state: AppState): string {
   return JSON.stringify(state, (key, value) => (key === "isLoading" ? undefined : value));
 }
 
+function readStorage(key: string): string | null {
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function persistStorage(key: string, value: string): void {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    // The app remains usable when WebView storage is unavailable. Restore uses
+    // a separate strict write path so its startup evidence is not acknowledged.
+  }
+}
+
 export function useAppPersistence(): UseAppPersistenceResult {
   const [state, setState] = useState<AppState>(() => loadAppState());
   const [theme, setTheme] = useState<ThemeMode>(() => {
-    const savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
+    const savedTheme = readStorage(THEME_STORAGE_KEY);
     return savedTheme === "dark" ? "dark" : "light";
   });
 
@@ -42,7 +59,7 @@ export function useAppPersistence(): UseAppPersistenceResult {
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      window.localStorage.setItem(STORAGE_KEY, serializeState(latestStateRef.current));
+      persistStorage(STORAGE_KEY, serializeState(latestStateRef.current));
     }, STATE_WRITE_DEBOUNCE_MS);
 
     return () => {
@@ -54,7 +71,7 @@ export function useAppPersistence(): UseAppPersistenceResult {
   // so a close/refresh during the debounce window does not drop the last edit.
   useEffect(() => {
     const flush = () => {
-      window.localStorage.setItem(STORAGE_KEY, serializeState(latestStateRef.current));
+      persistStorage(STORAGE_KEY, serializeState(latestStateRef.current));
     };
     window.addEventListener("beforeunload", flush);
     window.addEventListener("pagehide", flush);
@@ -66,7 +83,7 @@ export function useAppPersistence(): UseAppPersistenceResult {
   }, []);
 
   useEffect(() => {
-    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+    persistStorage(THEME_STORAGE_KEY, theme);
   }, [theme]);
 
   return { state, setState, theme, setTheme };

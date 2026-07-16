@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "tag": "v0.0.0",
+  "appVersion": "0.0.0",
+  "testedArtifact": "AI.Chat.Multiplexer_0.0.0_x64-setup.exe",
+  "testedArtifactSha256": "replace-with-lowercase-sha256",
+  "windowsVersion": "Windows 11 24H2 build ...",
+  "webview2Version": "...",
+  "testedAt": "YYYY-MM-DDTHH:mm:ss.sssZ",
+  "tester": "release-qa-owner",
+  "evidenceRef": "PRIVATE-EVIDENCE-001",
+  "cases": {
+    "authenticode": "NOT-TESTED",
+    "cleanInstall": "NOT-TESTED",
+    "firstRun": "NOT-TESTED",
+    "existingUpgrade": "NOT-TESTED",
+    "updaterInstallRestart": "NOT-TESTED",
+    "newTabLanguages": "NOT-TESTED",
+    "multiPaneProfiles": "NOT-TESTED",
+    "popupAndOAuth": "NOT-TESTED",
+    "download": "NOT-TESTED",
+    "configBackupRestore": "NOT-TESTED",
+    "fullBackupRestoreAndInvalidArchive": "NOT-TESTED",
+    "restartPersistence": "NOT-TESTED",
+    "uninstallRelaunch": "NOT-TESTED"
+  },
+  "notes": ""
+}

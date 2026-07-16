@@ -15,11 +15,17 @@ import { useNativeTabStatus } from "./hooks/useNativeTabStatus";
 import { usePaneActions } from "./hooks/usePaneActions";
 import { usePromptDialogs } from "./hooks/usePromptDialogs";
 import { useProfileWorkspaceActions } from "./hooks/useProfileWorkspaceActions";
+import { useNativeNewWindowRequests } from "./hooks/useNativeNewWindowRequests";
+import { useDiagnostics } from "./hooks/useDiagnostics";
 import { useTranslation } from "./i18n";
+import { KNOWN_ISSUES_URL, SUPPORT_ISSUE_URL } from "./appCore";
+import { useOnboarding } from "./onboarding";
+import { applyWorkflowTemplate, type WorkflowTemplateId } from "./workflowTemplates";
 
 function DesktopApp() {
-  const { lang } = useTranslation();
+  const { lang, t } = useTranslation();
   const { state, setState, theme, setTheme } = useAppPersistence();
+  const onboarding = useOnboarding();
   const [focusedPaneId, setFocusedPaneId] = useState<string | null>(null);
   const {
     isNewPaneMenuOpen,
@@ -60,6 +66,8 @@ function DesktopApp() {
   } = useDragState();
   const downloadManager = useDownloadManager();
   const downloadToasts = downloadManager.toasts;
+  useNativeNewWindowRequests({ setState, setAlertDialog });
+  const { exportSupportBundle } = useDiagnostics({ setConfirmDialog, setAlertDialog });
   const {
     updateStatus,
     backupBusy,
@@ -102,7 +110,7 @@ function DesktopApp() {
   useNativeWebviews({
     state,
     focusedPaneId,
-    suspended: shouldSuspendNativeWebviews || startupRestoreProcessing,
+    suspended: shouldSuspendNativeWebviews || startupRestoreProcessing || onboarding.isOpen,
     shellsRef: webviewShells,
     lang,
   });
@@ -155,6 +163,29 @@ function DesktopApp() {
     openTextPrompt,
     updateActiveWorkspace,
   });
+
+  function applyOnboardingTemplate(templateId: WorkflowTemplateId, name: string) {
+    setFocusedPaneId(null);
+    setState((current) => applyWorkflowTemplate(current, templateId, name));
+    onboarding.complete();
+  }
+
+  function openSupportIssue() {
+    setIsSettingsOpen(false);
+    setConfirmDialog({
+      title: t("support.privacyTitle"),
+      message: t("support.privacyMessage"),
+      confirmLabel: t("support.continue"),
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        await openReleasePage(SUPPORT_ISSUE_URL);
+      },
+    });
+  }
+
+  function openKnownIssues() {
+    void openReleasePage(KNOWN_ISSUES_URL);
+  }
 
   return (
     <main className={`app-shell theme-${theme}`}>
@@ -236,6 +267,16 @@ function DesktopApp() {
         importConfigJson={importConfigJson}
         exportFullBackup={exportFullBackup}
         restoreFullBackup={restoreFullBackup}
+        exportSupportBundle={exportSupportBundle}
+        openSupportIssue={openSupportIssue}
+        openKnownIssues={openKnownIssues}
+        isOnboardingOpen={onboarding.isOpen}
+        applyOnboardingTemplate={applyOnboardingTemplate}
+        skipOnboarding={onboarding.skip}
+        reopenOnboarding={() => {
+          setIsSettingsOpen(false);
+          onboarding.reopen();
+        }}
         isDownloadsOpen={isDownloadsOpen}
         setIsDownloadsOpen={setIsDownloadsOpen}
         downloadToasts={downloadToasts}

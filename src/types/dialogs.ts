@@ -1,11 +1,14 @@
 export interface ConfirmDialogOptions {
   title: string;
   message: string;
+  details?: string;
   confirmLabel?: string;
   cancelLabel?: string;
   hideCancel?: boolean;
   danger?: boolean;
   onConfirm: () => void | Promise<void>;
+  onCancelWhileBusy?: () => void | Promise<void>;
+  busyLabel?: string;
 }
 
 export interface AlertDialogOptions {

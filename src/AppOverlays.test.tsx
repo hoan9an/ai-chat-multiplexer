@@ -37,6 +37,13 @@ function defaultProps(overrides: Partial<AppOverlaysProps> = {}): AppOverlaysPro
     importConfigJson: vi.fn(),
     exportFullBackup: vi.fn(),
     restoreFullBackup: vi.fn(),
+    exportSupportBundle: vi.fn(),
+    openSupportIssue: vi.fn(),
+    openKnownIssues: vi.fn(),
+    isOnboardingOpen: false,
+    applyOnboardingTemplate: vi.fn(),
+    skipOnboarding: vi.fn(),
+    reopenOnboarding: vi.fn(),
     isDownloadsOpen: false,
     setIsDownloadsOpen: vi.fn(),
     downloadToasts: [],
@@ -111,6 +118,16 @@ describe("AppOverlays", () => {
       <AppOverlays {...defaultProps({ downloadToasts: [makeToast()] })} />,
     );
     expect(screen.getByText("Đang tải…")).toBeDefined();
+  });
+
+  it("renders onboarding and routes the selected template", () => {
+    const props = defaultProps({ isOnboardingOpen: true });
+    render(<AppOverlays {...props} />);
+    fireEvent.click(screen.getByRole("button", { name: /So sánh 3 AI/ }));
+    expect(props.applyOnboardingTemplate).toHaveBeenCalledWith(
+      "compare-three",
+      "So sánh 3 AI",
+    );
   });
 
   it("renders DownloadsPanel when isDownloadsOpen and routes close to setIsDownloadsOpen(false)", () => {

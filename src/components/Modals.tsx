@@ -90,23 +90,36 @@ export function ConfirmDialog({ dialog, onClose }: ConfirmDialogProps) {
     }
   };
 
+  const handleCancel = async () => {
+    if (isConfirming && dialog.onCancelWhileBusy) {
+      await dialog.onCancelWhileBusy();
+      return;
+    }
+    onClose();
+  };
+
   return (
     <div
       className="modal-backdrop"
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
+        if (event.target === event.currentTarget) void handleCancel();
       }}
     >
       <div className="modal-card">
         <h3 className="modal-title">{dialog.title}</h3>
         <p className="modal-message">{dialog.message}</p>
+        {dialog.details && (
+          <pre className="modal-details" aria-label={dialog.title}>
+            {dialog.details}
+          </pre>
+        )}
         <div className="modal-actions">
           {!dialog.hideCancel && (
             <button
               type="button"
               className="modal-btn"
-              onClick={onClose}
-              disabled={isConfirming}
+              onClick={() => void handleCancel()}
+              disabled={isConfirming && !dialog.onCancelWhileBusy}
             >
               {dialog.cancelLabel ?? t("common.cancel")}
             </button>
@@ -117,7 +130,9 @@ export function ConfirmDialog({ dialog, onClose }: ConfirmDialogProps) {
             onClick={() => void handleConfirm()}
             disabled={isConfirming}
           >
-            {dialog.confirmLabel ?? t("common.ok")}
+            {isConfirming && dialog.busyLabel
+              ? dialog.busyLabel
+              : dialog.confirmLabel ?? t("common.ok")}
           </button>
         </div>
       </div>

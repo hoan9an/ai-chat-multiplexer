@@ -14,6 +14,7 @@ import {
   type Workspace,
 } from "../appCore";
 import { getNewTabUrl, NEW_TAB_ICON, NEW_TAB_TITLE } from "../newtab";
+import { recordDiagnostic } from "../diagnostics";
 
 export interface UsePaneActionsArgs {
   setState: React.Dispatch<React.SetStateAction<AppState>>;
@@ -250,7 +251,15 @@ export function usePaneActions({
     void invoke("native_webview_navigate", {
       label: getNativeWebviewLabel(paneId, tab),
       action,
-    }).catch((error) => console.error("native_webview_navigate failed", error));
+    }).catch((error) => {
+      recordDiagnostic({
+        component: "webview",
+        code: "NAVIGATION_ACTION_FAILED",
+        severity: "error",
+        context: { action, command: "native_webview_navigate" },
+      });
+      console.error("native_webview_navigate failed", error);
+    });
   }
 
   function moveTabWithinPane(

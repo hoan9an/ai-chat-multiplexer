@@ -32,6 +32,10 @@ function defaultProps(overrides: Partial<SettingsModalProps> = {}): SettingsModa
     onImportConfig: vi.fn(),
     onExportFullBackup: vi.fn(),
     onRestoreFullBackup: vi.fn(),
+    onExportSupportBundle: vi.fn(),
+    onOpenSupportIssue: vi.fn(),
+    onOpenKnownIssues: vi.fn(),
+    onShowOnboarding: vi.fn(),
     ...overrides,
   };
 }
@@ -105,15 +109,16 @@ describe("SettingsModal", () => {
     expect(restoreBtn.title).toBe("Chỉ chạy trong app desktop");
   });
 
-  it("enables full-backup buttons and omits hint title in Tauri runtime", () => {
+  it("requires explicit privacy consent before enabling full backup in Tauri runtime", () => {
     tauriRuntime = true;
     const props = defaultProps();
     render(<SettingsModal {...props} />);
     const exportBtn = screen.getByRole("button", { name: /Full backup/ }) as HTMLButtonElement;
     const restoreBtn = screen.getByRole("button", { name: /Khôi phục từ backup/ }) as HTMLButtonElement;
-    expect(exportBtn.disabled).toBe(false);
+    expect(exportBtn.disabled).toBe(true);
     expect(restoreBtn.disabled).toBe(false);
-    // The undefined-title branch (lines 168 + 177) renders no title attribute.
+    fireEvent.click(screen.getByRole("checkbox"));
+    expect(exportBtn.disabled).toBe(false);
     expect(exportBtn.hasAttribute("title")).toBe(false);
     expect(restoreBtn.hasAttribute("title")).toBe(false);
   });
@@ -235,5 +240,18 @@ describe("SettingsModal", () => {
     expect(props.onOpenReleasePage).toHaveBeenCalledTimes(1);
     const calls = (props.onOpenReleasePage as ReturnType<typeof vi.fn>).mock.calls;
     expect(calls[0][0]).toMatch(/github\.com/i);
+  });
+
+  it("routes support, known-issues, and onboarding actions", () => {
+    const props = defaultProps();
+    render(<SettingsModal {...props} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Báo lỗi" }));
+    fireEvent.click(screen.getByRole("button", { name: "Các lỗi đã biết" }));
+    fireEvent.click(screen.getByRole("button", { name: "Mở lại hướng dẫn" }));
+
+    expect(props.onOpenSupportIssue).toHaveBeenCalledTimes(1);
+    expect(props.onOpenKnownIssues).toHaveBeenCalledTimes(1);
+    expect(props.onShowOnboarding).toHaveBeenCalledTimes(1);
   });
 });
