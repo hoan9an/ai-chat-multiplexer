@@ -34,12 +34,14 @@ test("release workflows do not rely on working-tree-only gitattributes", () => {
   assert.doesNotMatch(candidate, /\.gitattributes/);
 });
 
-test("release workflow finds draft releases by list API to avoid duplicate reruns", () => {
+test("release workflows find draft releases by list API", () => {
   const root = path.resolve(import.meta.dirname, "..");
-  const candidate = fs.readFileSync(path.join(root, ".github", "workflows", "release.yml"), "utf8");
-  assert.match(candidate, /listReleases/);
-  assert.match(candidate, /multiple draft releases/);
-  assert.doesNotMatch(candidate, /getReleaseByTag\(\{ owner, repo, tag \}\)/);
+  for (const workflow of ["release.yml", "publish-release.yml"]) {
+    const candidate = fs.readFileSync(path.join(root, ".github", "workflows", workflow), "utf8");
+    assert.match(candidate, /listReleases|releases\?per_page=100/);
+    assert.doesNotMatch(candidate, /getReleaseByTag/);
+    assert.doesNotMatch(candidate, /releases\/tags/);
+  }
 });
 
 test("smoke report requires every case to pass and binds the tested artifact hash", () => {

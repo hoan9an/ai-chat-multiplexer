@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Existing draft tag to verify and publish (for example v0.1.17)"
+        description: "Existing draft tag to verify and publish (for example v0.1.18)"
         required: true
         type: string
 
@@ -44,8 +44,17 @@ jobs:
       - name: Confirm immutable draft target
         run: |
           [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$ ]]
-          RELEASE_JSON="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}")"
+          RELEASE_JSON="$(
+            gh api --paginate --slurp "repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
+              | jq -c --arg tag "$RELEASE_TAG" '
+                [.[][] | select(.tag_name == $tag)] as $matches
+                | if ($matches | length) == 1 then $matches[0]
+                  else error("Expected exactly one release for tag " + $tag)
+                  end
+              '
+          )"
           test "$(jq -r '.draft' <<< "$RELEASE_JSON")" = "true"
+          echo "RELEASE_ID=$(jq -r '.id' <<< "$RELEASE_JSON")" >> "$GITHUB_ENV"
           TAG_SHA="$(git rev-list -n 1 "$RELEASE_TAG")"
           test "$TAG_SHA" = "$(git rev-parse HEAD)"
           echo "TAG_SHA=$TAG_SHA" >> "$GITHUB_ENV"
@@ -53,7 +62,6 @@ jobs:
 
       - name: Download complete draft inventory
         run: |
-          RELEASE_ID="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" --jq '.id')"
           gh api --paginate --slurp \
             "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}/assets?per_page=100" \
             | jq '[.[][]] | sort_by(.name) | map({id, name, size, updated_at, digest})' \
@@ -78,15 +86,21 @@ jobs:
             if (!/^v\d+\.\d+\.\d+(?:[-.][0-9A-Za-z.-]+)?$/.test(tag)) {
               throw new Error('Invalid release tag');
             }
-            const release = (await github.rest.repos.getReleaseByTag({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              tag,
-            })).data;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const matchingReleases = (await github.paginate(github.rest.repos.listReleases, {
+              owner,
+              repo,
+              per_page: 100,
+            })).filter(candidate => candidate.tag_name === tag);
+            if (matchingReleases.length !== 1) {
+              throw new Error(`Expected exactly one release for ${tag}; found ${matchingReleases.length}`);
+            }
+            const release = matchingReleases[0];
             if (!release.draft) throw new Error(`${tag} is not a draft`);
             const assets = await github.paginate(github.rest.repos.listReleaseAssets, {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
+              owner,
+              repo,
               release_id: release.id,
               per_page: 100,
             });
@@ -105,15 +119,15 @@ jobs:
               throw new Error('Draft assets changed after release verification');
             }
             const tagRef = (await github.rest.git.getRef({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
+              owner,
+              repo,
               ref: `tags/${tag}`,
             })).data.object;
             let tagSha = tagRef.sha;
             if (tagRef.type === 'tag') {
               tagSha = (await github.rest.git.getTag({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
+                owner,
+                repo,
                 tag_sha: tagRef.sha,
               })).data.object.sha;
             }
@@ -121,8 +135,8 @@ jobs:
               throw new Error('Tag target changed after release verification');
             }
             await github.rest.repos.updateRelease({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
+              owner,
+              repo,
               release_id: release.id,
               name: `AI Chat Multiplexer ${tag} unsigned Windows beta`,
               draft: false,

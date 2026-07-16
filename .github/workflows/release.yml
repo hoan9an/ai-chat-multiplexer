@@ -272,16 +272,22 @@ jobs:
           script: |
             const fs = require('fs');
             const tag = context.ref.replace('refs/tags/', '');
-            const release = (await github.rest.repos.getReleaseByTag({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              tag,
-            })).data;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const matchingReleases = (await github.paginate(github.rest.repos.listReleases, {
+              owner,
+              repo,
+              per_page: 100,
+            })).filter(candidate => candidate.tag_name === tag);
+            if (matchingReleases.length !== 1) {
+              throw new Error(`Expected exactly one draft release for ${tag}; found ${matchingReleases.length}`);
+            }
+            const release = matchingReleases[0];
             if (!release.draft) throw new Error('Refusing to modify a published release');
             const sums = fs.readFileSync('release-assets/SHA256SUMS.txt', 'utf8').trim();
             await github.rest.repos.updateRelease({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
+              owner,
+              repo,
               release_id: release.id,
               name: `AI Chat Multiplexer ${tag} release candidate`,
               body: [
