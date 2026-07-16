@@ -2,7 +2,7 @@
 
 AI Chat Multiplexer is a local-first desktop workspace for running multiple AI web apps side by side. It is built with Tauri 2, React 19, TypeScript, Vite, and a Rust backend that manages native child webviews, per-profile browser session storage, downloads, backups, restores, and desktop updates.
 
-![Status](https://img.shields.io/badge/status-active-success) ![Version](https://img.shields.io/badge/version-0.1.13-blue) ![Tauri](https://img.shields.io/badge/Tauri-2-orange) ![React](https://img.shields.io/badge/React-19-blue) ![License](https://img.shields.io/badge/license-MIT-green)
+![Status](https://img.shields.io/badge/status-active-success) ![Version](https://img.shields.io/badge/version-0.1.14-blue) ![Tauri](https://img.shields.io/badge/Tauri-2-orange) ![React](https://img.shields.io/badge/React-19-blue) ![License](https://img.shields.io/badge/license-MIT-green)
 
 Languages: [English](./README.md) · [Tiếng Việt](./README.vi.md) · [中文](./README.zh.md)
 
@@ -260,7 +260,7 @@ Completed downloads can be opened directly or revealed in the platform file mana
 
 ## Updates And Releases
 
-The app version is currently `0.1.13` in:
+The app version is currently `0.1.14` in:
 
 - `package.json`
 - `src/appCore.ts`

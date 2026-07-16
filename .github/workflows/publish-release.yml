@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Existing draft tag to verify and publish (for example v0.1.13)"
+        description: "Existing draft tag to verify and publish (for example v0.1.14)"
         required: true
         type: string
 
@@ -39,9 +39,7 @@ jobs:
           node-version: 20
 
       - name: Install minisign
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y minisign
+        uses: ./.github/actions/setup-minisign
 
       - name: Confirm immutable draft target
         run: |

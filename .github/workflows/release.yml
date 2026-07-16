@@ -214,9 +214,7 @@ jobs:
           node-version: 20
 
       - name: Install minisign
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y minisign
+        uses: ./.github/actions/setup-minisign
 
       - name: Download draft release assets
         run: |
