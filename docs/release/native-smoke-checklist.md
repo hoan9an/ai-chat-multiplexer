@@ -26,8 +26,9 @@ publication because GitHub draft releases are not served as `latest`.
 
 ## Required report cases
 
-- [ ] `authenticode`: installer signature is Valid, timestamped, and chains on
-  the test machine.
+- [ ] `authenticode`: for stable releases, installer signature is Valid,
+  timestamped, and chains on the test machine. For unsigned beta releases,
+  confirm the expected Windows publisher warning is shown and documented.
 - [ ] `cleanInstall`: install and first launch succeed on the clean account.
 - [ ] `firstRun`: onboarding can be completed or skipped without losing state.
 - [ ] `existingUpgrade`: existing workspace, profiles, tabs, and settings remain.

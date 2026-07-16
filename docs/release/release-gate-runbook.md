@@ -8,10 +8,12 @@ release candidate, not permission to publish.
 - GitHub environment `production-release` with at least one required reviewer.
 - Updater signing secrets: `TAURI_SIGNING_PRIVATE_KEY` and
   `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`.
-- Windows signing secrets: `WINDOWS_SIGNING_PFX_BASE64`,
+- Stable Windows signing secrets: `WINDOWS_SIGNING_PFX_BASE64`,
   `WINDOWS_SIGNING_PFX_PASSWORD`, and `WINDOWS_TIMESTAMP_URL`.
 - No signing credential may be written to the repository, release notes,
   support bundle, native smoke report, or retained build artifact.
+  Early beta releases may ship unsigned Authenticode installers only when the
+  release notes and landing page clearly describe the Windows publisher warning.
 
 ## Candidate creation
 
@@ -19,8 +21,8 @@ release candidate, not permission to publish.
 2. Create a new immutable version tag. Do not reuse or force-update a published
    tag as a release workflow.
 3. The `Release candidate` workflow validates source and creates a draft.
-4. Matrix jobs build updater artifacts. The Windows job fails closed without a
-   timestamped Authenticode certificate.
+4. Matrix jobs build updater artifacts. Windows beta jobs may produce unsigned
+   Authenticode installers, but updater signatures remain mandatory.
 5. The artifact gate downloads the complete draft, creates one merged
    `latest.json`, verifies exact inventory, updater signatures, installer hashes,
    version lock, source archive, checksums, and provenance.
@@ -30,7 +32,8 @@ Expected automated evidence:
 
 - `latest.json`
 - updater `.sig` files
-- `authenticode-report.json`
+- `authenticode-report.json` with `required: false` for unsigned beta or
+  `required: true` for stable signed releases.
 - `SHA256SUMS.txt`
 - `release-provenance.json`
 - versioned source archive
@@ -59,14 +62,16 @@ the published tag or mutate published assets.
 ## Native approval and publication
 
 1. Download the draft Windows NSIS installer and record its SHA256.
-2. Complete [native-smoke-checklist.md](native-smoke-checklist.md) on controlled
+2. For stable releases, complete [native-smoke-checklist.md](native-smoke-checklist.md) on controlled
    Windows machines. Use dedicated provider test accounts.
-3. Fill `scripts/native-smoke-report.template.json`. Every required case except
+3. For stable releases, fill `scripts/native-smoke-report.template.json`. Every required case except
    `updaterInstallRestart` must be `PASS`; keep `updaterInstallRestart` as
    `BLOCKED` or `NOT-TESTED` until post-publication updater smoke is exercised.
    Do not include account identifiers, prompts, chat content, cookies, tokens,
    full URLs, full paths, or private evidence.
-4. Upload the file as exactly `native-smoke-report.json` to the draft.
+4. Upload the file as exactly `native-smoke-report.json` to the draft when this
+   is a stable release. Unsigned beta releases may publish without this report
+   only when the release is marked prerelease and the unsigned status is clear.
 5. Dispatch `Publish verified release` for the exact draft tag.
 6. A reviewer approves `production-release` only after reviewing the draft,
    smoke evidence reference, installer hash, supported-platform statement, and
@@ -74,7 +79,7 @@ the published tag or mutate published assets.
 7. After approval, the workflow downloads and verifies the entire draft again,
    cryptographically checks updater signatures, confirms the tag target, and
    only then publishes it as latest.
-8. Immediately test updater install/restart from an older supported install to
+8. Immediately test install and updater install/restart from an older supported install to
    the newly published GitHub `latest`. Record the result in the release issue or
    private evidence store, and ship a patch release if it fails.
 
@@ -82,6 +87,8 @@ the published tag or mutate published assets.
 
 - Leave a failed candidate as draft and record an owner/disposition.
 - Do not publish an unsigned Windows artifact as supported.
+  For early beta, publish it only as an unsigned Windows beta with explicit
+  publisher-warning copy.
 - Do not delete or rewrite a published tag to roll back. Publish a higher patch
   version that fixes or reverts the defect.
 - For a severe updater incident, follow

@@ -31,7 +31,9 @@ when a supported callback flow exists.
 
 - The supported Windows release must pass the release artifact gate.
 - Tauri updater artifacts must have a valid updater signature.
-- Publicly supported installers must have a valid Authenticode signature.
+- Publicly supported stable installers must have a valid Authenticode signature.
+  Early beta installers may be unsigned only when the release notes clearly warn
+  about Windows publisher prompts.
 - An unsigned build may be distributed only as an explicitly labeled internal
   or experimental artifact, never as the supported paid-beta installer.
 

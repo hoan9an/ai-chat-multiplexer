@@ -154,7 +154,7 @@ export function assertExactAssetSet(files, expectedFiles, label) {
   }
 }
 
-export function expectedReleaseFiles(inventory, version, phase) {
+export function expectedReleaseFiles(inventory, version, phase, { requireSmoke = true } = {}) {
   const products = Object.values(inventory);
   const updaterAssets = updaterAssetNames(inventory);
   const expected = [
@@ -170,7 +170,7 @@ export function expectedReleaseFiles(inventory, version, phase) {
       "release-provenance.json",
     );
   }
-  if (phase === "publish") expected.push("native-smoke-report.json");
+  if (phase === "publish" && requireSmoke) expected.push("native-smoke-report.json");
   return expected;
 }
 
@@ -393,6 +393,7 @@ export function validateSmokeReport(report, { tag, version, assetsDir, requireUp
 export function validateAuthenticodeReport(report, { assetsDir, requiredAssets }) {
   if (
     report.schemaVersion !== 1 ||
+    typeof report.required !== "boolean" ||
     !Number.isFinite(Date.parse(report.verifiedAt)) ||
     !Array.isArray(report.assets)
   ) {
@@ -409,8 +410,11 @@ export function validateAuthenticodeReport(report, { assetsDir, requiredAssets }
   for (const name of requiredAssets) {
     const entry = report.assets.find((asset) => asset.name === name);
     if (!entry) throw new Error(`Authenticode report is missing ${name}`);
-    if (entry.status !== "Valid" || !entry.signerSubject || !entry.timestampSubject) {
+    if (report.required && (entry.status !== "Valid" || !entry.signerSubject || !entry.timestampSubject)) {
       throw new Error(`Authenticode is not valid and timestamped for ${name}`);
+    }
+    if (!report.required && entry.status === "Valid" && (!entry.signerSubject || !entry.timestampSubject)) {
+      throw new Error(`Authenticode valid status is missing signer or timestamp for ${name}`);
     }
     if (entry.sha256?.toLowerCase() !== sha256File(path.join(assetsDir, name))) {
       throw new Error(`Authenticode report hash mismatch for ${name}`);

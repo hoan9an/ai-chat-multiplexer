@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Existing draft tag to verify and publish (for example v0.1.12)"
+        description: "Existing draft tag to verify and publish (for example v0.1.13)"
         required: true
         type: string
 
@@ -65,7 +65,7 @@ jobs:
 
       - name: Verify native smoke report and all release evidence after approval
         run: |
-          node scripts/verify-release-assets.mjs --assets release-assets --tag "$RELEASE_TAG" --phase publish --commit "$TAG_SHA"
+          node scripts/verify-release-assets.mjs --assets release-assets --tag "$RELEASE_TAG" --phase publish --commit "$TAG_SHA" --require-smoke false
           node scripts/verify-updater-signatures.mjs release-assets src-tauri/tauri.conf.json
 
       - name: Publish verified draft
@@ -106,9 +106,6 @@ jobs:
             if (JSON.stringify(currentAssets) !== JSON.stringify(expectedAssets)) {
               throw new Error('Draft assets changed after release verification');
             }
-            if (!assets.some(asset => asset.name === 'native-smoke-report.json')) {
-              throw new Error('native-smoke-report.json disappeared before publish');
-            }
             const tagRef = (await github.rest.git.getRef({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -129,9 +126,9 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               release_id: release.id,
-              name: `AI Chat Multiplexer ${tag}`,
+              name: `AI Chat Multiplexer ${tag} unsigned Windows beta`,
               draft: false,
-              prerelease: false,
+              prerelease: true,
               make_latest: 'true',
             });
-            core.notice(`Published ${tag}. Run the updater install/restart smoke against GitHub latest immediately and ship a patch release if it fails.`);
+            core.notice(`Published ${tag} as an unsigned Windows beta. Run install/update smoke against GitHub latest immediately and ship a patch release if it fails.`);

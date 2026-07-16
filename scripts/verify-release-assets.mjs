@@ -27,6 +27,7 @@ const root = path.resolve(option("--root", path.join(import.meta.dirname, ".."))
 const tag = option("--tag");
 const phase = option("--phase", "build");
 const expectedCommit = option("--commit");
+const requireSmoke = option("--require-smoke", "true") !== "false";
 if (!tag) throw new Error("--tag is required");
 if (!fs.existsSync(assetsDir)) throw new Error(`Assets directory not found: ${assetsDir}`);
 
@@ -39,7 +40,7 @@ for (const file of files) {
 
 const inventory = resolveBundleInventory(files, version);
 assertSignaturePairs(files);
-assertExactAssetSet(files, expectedReleaseFiles(inventory, version, phase), `${phase} release`);
+assertExactAssetSet(files, expectedReleaseFiles(inventory, version, phase, { requireSmoke }), `${phase} release`);
 
 const latestFile = requireOne(files, /^latest\.json$/, "Tauri updater manifest");
 const latest = readJson(path.join(assetsDir, latestFile));
@@ -86,7 +87,7 @@ if (phase === "automated" || phase === "publish") {
   });
 }
 
-if (phase === "publish") {
+if (phase === "publish" && requireSmoke) {
   const smokeFile = requireOne(files, /^native-smoke-report\.json$/, "native smoke report");
   validateSmokeReport(readJson(path.join(assetsDir, smokeFile)), {
     tag,

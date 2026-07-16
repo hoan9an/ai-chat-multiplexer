@@ -86,9 +86,10 @@ jobs:
                 name: `AI Chat Multiplexer ${tag} release candidate`,
                 body: [
                   'Release candidate. Do not distribute until the automated artifact gate,',
-                  'Windows native smoke report, and production-release approval all pass.',
+                  'Windows beta review, and production-release approval all pass.',
                   '',
-                  'Supported target: Windows 10/11 x64 with WebView2 Evergreen.',
+                  'Beta target: Windows 10/11 x64 with WebView2 Evergreen.',
+                  'Windows beta installers are not Authenticode-signed and may show OS publisher warnings.',
                   'macOS and Linux artifacts are experimental and unsupported.',
                 ].join('\n'),
                 draft: true,
@@ -113,8 +114,8 @@ jobs:
             args: ""
             windows_signing: false
           - platform: windows-latest
-            args: "--config src-tauri/tauri.windows-signing.conf.json"
-            windows_signing: true
+            args: ""
+            windows_signing: false
     runs-on: ${{ matrix.platform }}
     permissions:
       contents: write
@@ -155,7 +156,7 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Require Windows Authenticode credentials
+      - name: Import Windows Authenticode credentials
         if: matrix.windows_signing
         shell: pwsh
         env:
@@ -182,12 +183,15 @@ jobs:
           includeUpdaterJson: false
           args: ${{ matrix.args }}
 
-      - name: Verify Windows Authenticode and write report
-        if: matrix.windows_signing
+      - name: Write Windows signing status report
+        if: matrix.platform == 'windows-latest'
         shell: pwsh
+        env:
+          WINDOWS_AUTHENTICODE_REQUIRED: ${{ matrix.windows_signing }}
         run: |
           ./scripts/write-authenticode-report.ps1 `
             -BundleRoot './src-tauri/target/release/bundle' `
+            -Required:$([System.Boolean]::Parse($env:WINDOWS_AUTHENTICODE_REQUIRED)) `
             -OutputPath './authenticode-report.json'
           gh release upload "$env:GITHUB_REF_NAME" './authenticode-report.json' --clobber
 
@@ -277,10 +281,11 @@ jobs:
               body: [
                 '## Support status',
                 '',
-                '- Supported after native smoke approval: Windows 10/11 x64 with WebView2 Evergreen.',
+                '- Beta target: Windows 10/11 x64 with WebView2 Evergreen.',
                 '- Experimental and unsupported: macOS and Linux artifacts.',
-                '- Tauri updater signatures and Authenticode were verified by the release gate.',
-                '- Publication still requires `native-smoke-report.json`, production approval, and post-publication updater smoke follow-up.',
+                '- Tauri updater signatures were verified by the release gate.',
+                '- Windows artifacts are unsigned Authenticode beta builds; expect OS publisher warnings.',
+                '- Publication still requires production approval and post-publication updater smoke follow-up.',
                 '',
                 `Source commit: ${context.sha}`,
                 `Workflow: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,

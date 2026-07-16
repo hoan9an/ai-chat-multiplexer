@@ -226,7 +226,12 @@ function writeCompleteReleaseFixture(dir) {
   }));
   fs.writeFileSync(
     path.join(dir, "authenticode-report.json"),
-    JSON.stringify({ schemaVersion: 1, verifiedAt: "2026-07-16T00:00:00.000Z", assets: signedAssets }),
+    JSON.stringify({
+      schemaVersion: 1,
+      required: false,
+      verifiedAt: "2026-07-16T00:00:00.000Z",
+      assets: signedAssets,
+    }),
   );
 
   const sourceArchive = `ai-chat-multiplexer-${version}-source.tar.gz`;
@@ -302,10 +307,22 @@ test("Authenticode report requires the exact signed Windows asset inventory", ()
     });
     const valid = {
       schemaVersion: 1,
+      required: true,
       verifiedAt: "2026-07-16T00:00:00.000Z",
       assets: requiredAssets.map(entry),
     };
     validateAuthenticodeReport(valid, { assetsDir: dir, requiredAssets });
+    validateAuthenticodeReport({
+      ...valid,
+      required: false,
+      assets: requiredAssets.map((name) => ({
+        name,
+        sha256: sha256File(path.join(dir, name)),
+        status: "NotSigned",
+        signerSubject: null,
+        timestampSubject: null,
+      })),
+    }, { assetsDir: dir, requiredAssets });
     assert.throws(
       () => validateAuthenticodeReport({ ...valid, assets: [entry(requiredAssets[0])] }, {
         assetsDir: dir,
@@ -336,6 +353,10 @@ test("complete publish fixture passes exact release inventory verification", () 
       listAssetFiles(dir),
       expectedReleaseFiles(inventory, version, "publish").sort(),
     );
+    assert.deepEqual(
+      listAssetFiles(dir).filter((file) => file !== "native-smoke-report.json"),
+      expectedReleaseFiles(inventory, version, "publish", { requireSmoke: false }).sort(),
+    );
     const result = spawnSync(
       process.execPath,
       [
@@ -352,6 +373,26 @@ test("complete publish fixture passes exact release inventory verification", () 
       { cwd: path.resolve(import.meta.dirname, ".."), encoding: "utf8" },
     );
     assert.equal(result.status, 0, result.stderr || result.stdout);
+
+    fs.rmSync(path.join(dir, "native-smoke-report.json"));
+    const betaPublish = spawnSync(
+      process.execPath,
+      [
+        path.join(import.meta.dirname, "verify-release-assets.mjs"),
+        "--assets",
+        dir,
+        "--tag",
+        tag,
+        "--phase",
+        "publish",
+        "--commit",
+        "fixture-commit",
+        "--require-smoke",
+        "false",
+      ],
+      { cwd: path.resolve(import.meta.dirname, ".."), encoding: "utf8" },
+    );
+    assert.equal(betaPublish.status, 0, betaPublish.stderr || betaPublish.stdout);
 
     fs.writeFileSync(path.join(dir, "stale-installer.exe"), "stale");
     const stale = spawnSync(
