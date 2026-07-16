@@ -60,13 +60,22 @@ jobs:
             const tag = context.ref.replace('refs/tags/', '');
             const owner = context.repo.owner;
             const repo = context.repo.repo;
-            let release;
-            try {
-              release = (await github.rest.repos.getReleaseByTag({ owner, repo, tag })).data;
-              if (!release.draft) {
-                core.setFailed(`Release ${tag} is already published. Published assets are immutable.`);
-                return;
-              }
+            const matchingReleases = (await github.paginate(github.rest.repos.listReleases, {
+              owner,
+              repo,
+              per_page: 100,
+            })).filter(candidate => candidate.tag_name === tag);
+            const publishedRelease = matchingReleases.find(candidate => !candidate.draft);
+            if (publishedRelease) {
+              core.setFailed(`Release ${tag} is already published. Published assets are immutable.`);
+              return;
+            }
+            if (matchingReleases.length > 1) {
+              core.setFailed(`Release ${tag} has multiple draft releases. Delete duplicate drafts before rerunning.`);
+              return;
+            }
+            let release = matchingReleases[0];
+            if (release) {
               const assets = await github.paginate(github.rest.repos.listReleaseAssets, {
                 owner,
                 repo,
@@ -76,8 +85,7 @@ jobs:
               for (const asset of assets) {
                 await github.rest.repos.deleteReleaseAsset({ owner, repo, asset_id: asset.id });
               }
-            } catch (error) {
-              if (error.status !== 404) throw error;
+            } else {
               release = (await github.rest.repos.createRelease({
                 owner,
                 repo,

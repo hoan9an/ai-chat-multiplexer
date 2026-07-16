@@ -66,7 +66,7 @@ export const LEGACY_STATE_V3_KEY = "ai-chat-multiplexer-state-v3";
 export const LEGACY_LAYOUT_KEY = "ai-chat-multiplexer-layout-v2";
 export const THEME_STORAGE_KEY = "ai-chat-multiplexer-theme";
 export const DEFAULT_PROFILE_ID = "prof-default";
-export const APP_VERSION = "0.1.16";
+export const APP_VERSION = "0.1.17";
 export const GITHUB_REPO = "hoan9an/ai-chat-multiplexer";
 export const RELEASES_URL = `https://github.com/${GITHUB_REPO}/releases/latest`;
 export const SUPPORT_ISSUE_URL = `https://github.com/${GITHUB_REPO}/issues/new?template=bug-report.yml`;
