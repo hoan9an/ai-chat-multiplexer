@@ -117,7 +117,7 @@
           <rect x="5" y="13" width="6" height="6" rx="1.4" fill="#1a1408" fill-opacity="0.35" />
           <rect x="13" y="13" width="6" height="6" rx="1.4" fill="#1a1408" fill-opacity="0.85" />
         </svg>
-        <span class="brand-name"><b>AI</b> Multiplexer</span>
+        <span class="brand-name">AI MULTIPLEXER</span>
       </a>
 
       <div class="nav-links" id="navLinks">
@@ -157,7 +157,7 @@
     <div class="container">
       <div class="hero-badge">
         <span class="dot"></span>
-        v0.1.19 beta · Open Source · MIT License
+        <span data-release-label>Latest beta</span> · Open Source · MIT License
       </div>
 
       <h1>
@@ -173,15 +173,15 @@
 
       <div class="hero-actions">
         <!-- Windows native -->
-        <a href="https://github.com/hoan9an/ai-chat-multiplexer/releases" target="_blank" rel="noopener" class="btn btn-primary btn-lg" data-os="win">
+        <a href="https://github.com/hoan9an/ai-chat-multiplexer/releases/latest" target="_blank" rel="noopener" class="btn btn-primary btn-lg" data-os="win">
           <svg class="icon"><use href="#i-download"/></svg>
-          View Windows Releases
+          View latest Windows beta
         </a>
-        <!-- macOS — coming soon -->
-        <span class="btn btn-primary btn-lg btn-macos" data-os="mac">
+        <!-- macOS artifacts are experimental -->
+        <a href="https://github.com/hoan9an/ai-chat-multiplexer/releases" target="_blank" rel="noopener" class="btn btn-primary btn-lg btn-macos" data-os="mac">
           <svg class="icon"><use href="#i-download"/></svg>
-          Download for macOS
-        </span>
+          View experimental builds
+        </a>
         <a href="#demo" class="btn btn-secondary btn-lg" data-os="any">
           <svg class="icon"><use href="#i-play"/></svg>
           Watch the Demo
@@ -232,9 +232,6 @@
         </div>
       </div>
 
-      <p class="platform-note reveal">
-        Windows is the supported beta target. macOS and Linux builds are experimental until platform smoke testing, signing, and support ownership are complete.
-      </p>
     </div>
   </section>
 
@@ -288,8 +285,8 @@
         <div class="feature-card reveal">
           <div class="feature-icon"><svg><use href="#i-archive"/></svg></div>
           <h3>Backup, restore &amp; auto-update</h3>
-          <p>Export/import config as JSON, or create a full ZIP backup including profile session files. The desktop app checks GitHub releases and installs signed updates through the Tauri updater.</p>
-          <div class="feature-detail">Full ZIP backup is desktop-only</div>
+          <p>Move layout and profile settings with config JSON, or protect local session data in an encrypted full backup. The app can restore legacy ZIP backups and check GitHub Releases for desktop updates.</p>
+          <div class="feature-detail">Full backup v2 · encrypted · passphrase never stored</div>
         </div>
       </div>
 
@@ -342,7 +339,7 @@
         <div class="demo-point"><span class="arrow">→</span> Open Claude, ChatGPT, and Gemini side by side and ask the same question</div>
         <div class="demo-point"><span class="arrow">→</span> Switch between isolated profiles — each keeps its own login session</div>
         <div class="demo-point"><span class="arrow">→</span> Drag tabs between panes that share a profile, or detach into a new pane</div>
-        <div class="demo-point"><span class="arrow">→</span> Back up and restore your entire workspace as a ZIP or JSON</div>
+        <div class="demo-point"><span class="arrow">→</span> Export config JSON or create an encrypted full backup of local sessions</div>
       </div>
     </div>
   </section>
@@ -564,14 +561,14 @@
 
       <div style="text-align:center;margin-top:3rem" class="reveal">
         <!-- secondary CTA — show all platforms -->
-        <a href="https://github.com/hoan9an/ai-chat-multiplexer/releases" target="_blank" rel="noopener" class="btn btn-primary btn-lg" data-os="win">
+        <a href="https://github.com/hoan9an/ai-chat-multiplexer/releases/latest" target="_blank" rel="noopener" class="btn btn-primary btn-lg" data-os="win">
           <svg class="icon"><use href="#i-download"/></svg>
           View Windows Releases — free &amp; open source
         </a>
-        <span class="btn btn-outline btn-lg btn-macos" data-os="mac">
+        <a href="https://github.com/hoan9an/ai-chat-multiplexer/releases" target="_blank" rel="noopener" class="btn btn-outline btn-lg btn-macos" data-os="mac">
           <svg class="icon"><use href="#i-download"/></svg>
-          macOS — coming soon
-        </span>
+          View experimental builds
+        </a>
       </div>
     </div>
   </section>
@@ -611,15 +608,15 @@
 
         <div class="cta-actions">
           <!-- Windows release page -->
-          <a href="https://github.com/hoan9an/ai-chat-multiplexer/releases" target="_blank" rel="noopener" class="btn btn-primary btn-lg">
+          <a href="https://github.com/hoan9an/ai-chat-multiplexer/releases/latest" target="_blank" rel="noopener" class="btn btn-primary btn-lg">
             <svg class="icon"><use href="#i-download"/></svg>
             View Windows Releases
           </a>
-          <!-- macOS — coming soon -->
-          <span class="btn btn-outline btn-lg btn-macos">
+          <!-- macOS and Linux artifacts are experimental -->
+          <a href="https://github.com/hoan9an/ai-chat-multiplexer/releases" target="_blank" rel="noopener" class="btn btn-outline btn-lg btn-macos">
             <svg class="icon"><use href="#i-download"/></svg>
-          Download for macOS
-        </span>
+            View experimental builds
+          </a>
         <a href="https://github.com/hoan9an/ai-chat-multiplexer" target="_blank" rel="noopener" class="btn btn-ghost btn-lg">
           <svg class="icon"><use href="#i-github"/></svg>
           Source on GitHub
@@ -627,9 +624,9 @@
         </div>
 
         <div class="cta-meta">
-          <span>Version <strong>0.1.19 beta</strong></span>
+          <span>Release <strong data-release-label>Latest beta</strong></span>
           <span class="sep">·</span>
-          <a href="https://github.com/hoan9an/ai-chat-multiplexer#quick-start" target="_blank" rel="noopener">Run from source</a>
+          <a href="https://github.com/hoan9an/ai-chat-multiplexer#build-from-source" target="_blank" rel="noopener">Run from source</a>
           <span class="sep">·</span>
           <a href="https://github.com/hoan9an/ai-chat-multiplexer/releases" target="_blank" rel="noopener">All releases</a>
           <span class="sep">·</span>
@@ -686,7 +683,7 @@
             <svg class="faq-icon"><use href="#i-chevron"/></svg>
           </button>
           <div class="faq-answer"><div class="faq-answer-inner">
-            Windows 10/11 x64 with WebView2 Evergreen is the supported beta target. macOS and Linux artifacts are experimental until platform smoke testing, signing, and support ownership are complete. You can also run the web dev build, though many AI sites block iframe rendering.
+            Windows 10/11 x64 with WebView2 Evergreen is the supported beta target. macOS and Linux artifacts are experimental and unsupported. Check the latest release notes before installing them.
           </div></div>
         </div>
 
@@ -696,7 +693,7 @@
             <svg class="faq-icon"><use href="#i-chevron"/></svg>
           </button>
           <div class="faq-answer"><div class="faq-answer-inner">
-            No. The app is local-first: workspace state lives in <code>localStorage</code>, and your chats connect directly to the AI service websites you open — never through a proxy. The only other outbound connections are to GitHub, to check for and download signed updates. It never proxies, caches, decrypts, or bypasses cookies, tokens, or site protections.
+            No. The app is local-first: workspace state lives in <code>localStorage</code>, and your chats connect directly to the AI service websites you open — never through a proxy. It contacts GitHub for release checks and update downloads. Tauri updater packages are signature-verified, but that is separate from Windows Authenticode; check each release's notes for installer signing status. The app never proxies or bypasses site protections.
           </div></div>
         </div>
       </div>
@@ -719,7 +716,7 @@
               <rect x="5" y="13" width="6" height="6" rx="1.4" fill="#1a1408" fill-opacity="0.35" />
               <rect x="13" y="13" width="6" height="6" rx="1.4" fill="#1a1408" fill-opacity="0.85" />
             </svg>
-            <span class="brand-name"><b>AI</b> Multiplexer</span>
+            <span class="brand-name">AI MULTIPLEXER</span>
           </a>
           <p>A local-first desktop command center for comparing, coordinating, and keeping multiple AI chats alive side by side.</p>
         </div>
