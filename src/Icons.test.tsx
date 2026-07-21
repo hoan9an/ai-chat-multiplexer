@@ -87,12 +87,12 @@ describe("Icons", () => {
     expect(svg.getAttribute("height")).toBe("40");
   });
 
-  it("AppWordmark renders text 'AI Multiplexer' inside an SVG with role=img", () => {
+  it("AppWordmark renders uppercase brand text inside an SVG with role=img", () => {
     const { container } = render(<AppWordmark />);
     const svg = container.querySelector("svg")!;
     expect(svg.getAttribute("height")).toBe("20");
     expect(svg.getAttribute("role")).toBe("img");
-    expect(svg.getAttribute("aria-label")).toBe("AI Multiplexer");
-    expect(container.querySelector("text")?.textContent).toBe("AI Multiplexer");
+    expect(svg.getAttribute("aria-label")).toBe("AI MULTIPLEXER");
+    expect(container.querySelector("text")?.textContent).toBe("AI MULTIPLEXER");
   });
 });

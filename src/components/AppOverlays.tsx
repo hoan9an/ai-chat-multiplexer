@@ -35,14 +35,18 @@ export interface AppOverlaysProps {
   backupBusy: BackupBusy;
   exportConfigJson: () => void;
   importConfigJson: () => void;
-  exportFullBackup: () => void;
-  restoreFullBackup: () => void;
+  exportFullBackup: (passphrase: string) => void | Promise<void>;
+  restoreFullBackup: (passphrase: string) => void | Promise<void>;
+  cancelRestoreFullBackup: () => void | Promise<void>;
   exportSupportBundle: () => void;
   openSupportIssue: () => void;
   openKnownIssues: () => void;
 
   isOnboardingOpen: boolean;
-  applyOnboardingTemplate: (templateId: WorkflowTemplateId, name: string) => void;
+  applyOnboardingTemplate: (
+    templateId: WorkflowTemplateId,
+    name: string,
+  ) => void;
   skipOnboarding: () => void;
   reopenOnboarding: () => void;
 
@@ -79,6 +83,7 @@ export function AppOverlays(props: AppOverlaysProps) {
     importConfigJson,
     exportFullBackup,
     restoreFullBackup,
+    cancelRestoreFullBackup,
     exportSupportBundle,
     openSupportIssue,
     openKnownIssues,
@@ -119,6 +124,7 @@ export function AppOverlays(props: AppOverlaysProps) {
         onImportConfig={importConfigJson}
         onExportFullBackup={exportFullBackup}
         onRestoreFullBackup={restoreFullBackup}
+        onCancelRestoreFullBackup={cancelRestoreFullBackup}
         onExportSupportBundle={exportSupportBundle}
         onOpenSupportIssue={openSupportIssue}
         onOpenKnownIssues={openKnownIssues}
@@ -131,7 +137,10 @@ export function AppOverlays(props: AppOverlaysProps) {
         onSkip={skipOnboarding}
       />
 
-      <ConfirmDialog dialog={confirmDialog} onClose={() => setConfirmDialog(null)} />
+      <ConfirmDialog
+        dialog={confirmDialog}
+        onClose={() => setConfirmDialog(null)}
+      />
 
       <AlertDialog dialog={alertDialog} onClose={() => setAlertDialog(null)} />
 

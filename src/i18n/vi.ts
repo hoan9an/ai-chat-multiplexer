@@ -44,7 +44,8 @@ export const vi = {
     "Bundle có {count} sự kiện cùng phiên bản app, Windows/kiến trúc và WebView2. Không gồm cookie, token, prompt, nội dung chat, full URL, đường dẫn đầy đủ hoặc file session. Bạn tự quyết định nơi lưu và có gửi file hay không.",
   "diagnostics.saveTitle": "Lưu support bundle",
   "diagnostics.exportFailedTitle": "Không thể xuất support bundle",
-  "diagnostics.exportFailed": "Không thể lưu file chẩn đoán. Mã lỗi đã được ghi cục bộ.",
+  "diagnostics.exportFailed":
+    "Không thể lưu file chẩn đoán. Mã lỗi đã được ghi cục bộ.",
 
   // First run and support
   "onboarding.firstRun": "Thiết lập lần đầu",
@@ -54,11 +55,13 @@ export const vi = {
   "onboarding.checkSignIn": "Đăng nhập trực tiếp trên từng dịch vụ AI",
   "onboarding.checkRun": "Thực hiện cùng một task và so sánh kết quả",
   "onboarding.compareThree": "So sánh 3 AI",
-  "onboarding.compareThreeDescription": "ChatGPT, Claude và Gemini trong ba pane.",
+  "onboarding.compareThreeDescription":
+    "ChatGPT, Claude và Gemini trong ba pane.",
   "onboarding.codingReview": "Review code",
   "onboarding.codingReviewDescription": "Claude và ChatGPT trong hai pane.",
   "onboarding.research": "Nghiên cứu",
-  "onboarding.researchDescription": "Perplexity, Gemini và ChatGPT trong ba pane.",
+  "onboarding.researchDescription":
+    "Perplexity, Gemini và ChatGPT trong ba pane.",
   "onboarding.skip": "Bỏ qua",
   "onboarding.showAgain": "Mở lại hướng dẫn",
   "support.reportIssue": "Báo lỗi",
@@ -71,7 +74,8 @@ export const vi = {
   // Updates
   "update.check": "Kiểm tra cập nhật",
   "update.checking": "Đang kiểm tra…",
-  "update.current": "Chưa có bản cập nhật mới hoặc bạn đã ở phiên bản mới nhất.",
+  "update.current":
+    "Chưa có bản cập nhật mới hoặc bạn đã ở phiên bản mới nhất.",
   "update.availablePrefix": "Có bản mới: ",
   "update.openDownload": "Mở trang tải",
   "update.downloadInstall": "Tải & cài đặt",
@@ -82,13 +86,12 @@ export const vi = {
 
   // Backup & restore
   "backup.configWord": "Cấu hình",
-  "backup.helpMiddle": " lưu workspace, pane, tab và profile. ",
+  "backup.helpMiddle": " lưu bố cục và profile. ",
   "backup.fullBackupWord": "Full backup",
-  "backup.helpEnd":
-    " lưu session profile (Lưu ý chỉ áp dụng trên thiết bị cũ).",
+  "backup.helpEnd": " lưu phiên trên thiết bị này.",
   "backup.exportConfig": "Xuất cấu hình (.json)",
   "backup.importConfig": "Nhập cấu hình",
-  "backup.fullBackup": "Full backup (.zip)",
+  "backup.fullBackup": "Full backup mã hóa (.acmbak)",
   "backup.restoreBackup": "Khôi phục từ backup",
   "backup.desktopOnly": "Chỉ chạy trong app desktop",
   "backup.saveConfigTitle": "Lưu cấu hình",
@@ -102,12 +105,11 @@ export const vi = {
   "backup.replaceConfigMsg":
     "Tất cả workspace và profile hiện tại sẽ bị thay bằng nội dung từ file.",
   "backup.replace": "Thay thế",
-  "backup.fullDesktopOnly":
-    "Full backup chỉ chạy trong app desktop.",
+  "backup.fullDesktopOnly": "Full backup chỉ chạy trong app desktop.",
   "backup.saveFullTitle": "Lưu full backup",
-  "backup.backupScheduledTitle": "Cần restart để backup đầy đủ",
+  "backup.backupScheduledTitle": "Backup mã hóa đã hoàn tất",
   "backup.backupScheduledMsg":
-    "App sẽ restart để backup đầy đủ file session:\n• {zip}\n• {config}\n\nKhi đổi máy hoặc Windows user, một số tài khoản có thể cần đăng nhập lại.",
+    "File đã được mã hóa và lưu tại:\n• {path}\n\nCác pane phiên đã đóng để backup nhất quán. Restart app ngay để tiếp tục? Khi đổi máy hoặc Windows user, một số tài khoản có thể cần đăng nhập lại.",
   "backup.startupBackupSuccess":
     "Backup hoàn tất:\n• {zip}\n• {config}\n\nDùng file ZIP để restore; giữ file JSON để tương thích. Không chia sẻ các file này.",
   "backup.startupBackupZipOnly":
@@ -124,22 +126,39 @@ export const vi = {
     "Backup hoàn tất:\n• {zip}\n• {config}\n\nDùng file ZIP để restore; giữ file JSON để tương thích. Không chia sẻ các file này.",
   "backup.backupError": "Backup lỗi: {msg}",
   "backup.restoreDesktopOnly": "Restore full chỉ chạy được trong app desktop.",
-  "backup.chooseRestoreTitle": "Chọn file backup .zip (sessions)",
+  "backup.chooseRestoreTitle": "Chọn file backup .acmbak hoặc .zip cũ",
   "backup.restoreTitle": "Restore full backup?",
   "backup.restoreMsg":
     "File session profile hiện tại có thể bị thay thế. Khi đổi máy hoặc Windows user, một số tài khoản có thể cần đăng nhập lại. App cần restart để áp dụng đầy đủ.",
   "backup.restore": "Restore",
-  "backup.restoreDone":
-    "Đã stage restore. Hãy đóng và mở lại app để áp dụng.",
+  "backup.restoreDone": "Đã stage restore. Hãy đóng và mở lại app để áp dụng.",
   "backup.restoreSuccessTitle": "Restore thành công",
   "backup.restoreSuccessMsg":
     "File session profile đã được stage. Restart app ngay để áp dụng full restore?",
   "backup.restartNow": "Restart ngay",
-  "backup.restartManual": "Không thể tự restart. Hãy đóng và mở lại app thủ công.",
+  "backup.restartManual":
+    "Không thể tự restart. Hãy đóng và mở lại app thủ công.",
   "backup.restoreError": "Restore lỗi: {msg}",
   "backup.unencryptedConsent":
-    "Tôi hiểu full backup hiện chưa mã hóa và có thể chứa cookie/token phiên đăng nhập. Tôi sẽ lưu như dữ liệu mật và không gửi file này cho support.",
+    "Full backup mới luôn được mã hóa bằng mật khẩu.",
+  "backup.encryptedNotice": "Backup được mã hóa, app không lưu mật khẩu.",
+  "backup.passwordExportTitle": "Tạo full backup mã hóa",
+  "backup.passwordRestoreTitle": "Mở full backup",
+  "backup.passwordExportHelp":
+    "Nhập mật khẩu riêng cho file backup. Nếu quên, file không thể khôi phục.",
+  "backup.passwordRestoreHelp":
+    "Nhập mật khẩu của file .acmbak. Có thể để trống khi khôi phục file ZIP cũ. Restore sẽ thay thế session hiện tại sau khi restart.",
+  "backup.passwordLabel": "Mật khẩu backup",
+  "backup.passwordConfirmLabel": "Nhập lại mật khẩu",
+  "backup.passwordRequired": "Hãy nhập mật khẩu backup.",
+  "backup.passwordMismatch": "Hai mật khẩu không khớp.",
+  "backup.createEncrypted": "Tạo backup mã hóa",
+  "backup.exporting": "Đang tạo backup…",
+  "backup.restoreAuthError":
+    "Không thể mở backup. Mật khẩu sai hoặc file đã bị thay đổi/hỏng.",
   "backup.restoring": "Đang restore…",
+  "backup.cancelRestore": "Hủy restore",
+  "backup.restoreCancelError": "Không thể hủy restore: {msg}",
 
   // Pane
   "pane.tabsOf": "Tab của {title}",
@@ -197,15 +216,17 @@ export const vi = {
   "header.newProfilePlaceholder": "vd: Work, Personal",
   "header.openSettings": "Mở cài đặt",
   "header.settings": "Cài đặt",
-  "header.brand": "AI Multiplexer",
+  "header.brand": "AI MULTIPLEXER",
 
   // Profile actions (dialogs)
   "profile.renameTitle": "Đổi tên profile",
   "profile.newNamePlaceholder": "Tên mới",
   "profile.inUseTitle": "Profile đang được dùng",
-  "profile.inUseMessage": "Profile này đang được dùng bởi một pane đang mở. Đóng pane trước khi xóa.",
-  "profile.deleteTitle": "Xóa profile \"{name}\"?",
-  "profile.deleteMessage": "Toàn bộ cookie và đăng nhập của profile này sẽ bị xóa vĩnh viễn.",
+  "profile.inUseMessage":
+    "Profile này đang được dùng bởi một pane đang mở. Đóng pane trước khi xóa.",
+  "profile.deleteTitle": 'Xóa profile "{name}"?',
+  "profile.deleteMessage":
+    "Toàn bộ cookie và đăng nhập của profile này sẽ bị xóa vĩnh viễn.",
 
   // Workspace switcher
   "workspace.choose": "Chọn workspace",
@@ -215,8 +236,9 @@ export const vi = {
   "workspace.deleteCurrent": "Xóa workspace",
   "workspace.paneCount": "{count} pane",
   "workspace.renameTitle": "Đổi tên workspace",
-  "workspace.deleteTitle": "Xóa workspace \"{name}\"?",
-  "workspace.deleteMessage": "Tất cả pane bên trong sẽ bị đóng. Profile và session vẫn được giữ lại.",
+  "workspace.deleteTitle": 'Xóa workspace "{name}"?',
+  "workspace.deleteMessage":
+    "Tất cả pane bên trong sẽ bị đóng. Profile và session vẫn được giữ lại.",
 };
 
 export type TranslationKey = keyof typeof vi;

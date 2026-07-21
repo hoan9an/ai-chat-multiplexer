@@ -13,7 +13,10 @@ import {
 } from "../appCore";
 import type { Update } from "@tauri-apps/plugin-updater";
 import type { UpdateStatus, BackupBusy } from "../types/updates";
-import type { AlertDialogOptions, ConfirmDialogOptions } from "../types/dialogs";
+import type {
+  AlertDialogOptions,
+  ConfirmDialogOptions,
+} from "../types/dialogs";
 import { recordDiagnostic } from "../diagnostics";
 
 export type { UpdateStatus, BackupBusy };
@@ -48,8 +51,9 @@ export interface UseBackupAndUpdatesResult {
   openReleasePage: (url: string) => Promise<void>;
   exportConfigJson: () => Promise<void>;
   importConfigJson: () => Promise<void>;
-  exportFullBackup: () => Promise<void>;
-  restoreFullBackup: () => Promise<void>;
+  exportFullBackup: (passphrase: string) => Promise<void>;
+  restoreFullBackup: (passphrase: string) => Promise<void>;
+  cancelRestoreFullBackup: () => Promise<void>;
 }
 
 function isMissingUpdaterReleaseJson(message: string): boolean {
@@ -78,9 +82,13 @@ export function useBackupAndUpdates({
   setAlertDialog,
 }: UseBackupAndUpdatesArgs): UseBackupAndUpdatesResult {
   const { t } = useTranslation();
-  const [updateStatus, setUpdateStatus] = useState<UpdateStatus>({ kind: "idle" });
+  const [updateStatus, setUpdateStatus] = useState<UpdateStatus>({
+    kind: "idle",
+  });
   const [backupBusy, setBackupBusy] = useState<BackupBusy>("idle");
-  const [startupRestoreProcessing, setStartupRestoreProcessing] = useState(() => isTauriRuntime());
+  const [startupRestoreProcessing, setStartupRestoreProcessing] = useState(() =>
+    isTauriRuntime(),
+  );
   // Holds the pending Update returned by the Tauri updater `check()` so a later
   // `downloadAndInstallUpdate()` can act on the exact same artifact (signature
   // verification happens inside the plugin during download/install).
@@ -112,7 +120,9 @@ export function useBackupAndUpdates({
       return;
     }
     let cancelled = false;
-    void Promise.resolve(invoke<StartupOperationResult[]>("session_startup_results"))
+    void Promise.resolve(
+      invoke<StartupOperationResult[]>("session_startup_results"),
+    )
       .then((results) => {
         if (cancelled) return;
         const safeResults = Array.isArray(results) ? results : [];
@@ -139,7 +149,9 @@ export function useBackupAndUpdates({
                     })
                 : t("backup.startupBackupError", { msg: result.message }),
             );
-            (result.warnings ?? []).forEach((warning) => messages.push(warning));
+            (result.warnings ?? []).forEach((warning) =>
+              messages.push(warning),
+            );
             return;
           }
 
@@ -147,12 +159,19 @@ export function useBackupAndUpdates({
             if (result.success && result.configJson) {
               const restoredState = appStateFromJson(result.configJson);
               if (restoredState) {
-                window.localStorage.setItem(STORAGE_KEY, JSON.stringify(restoredState));
+                window.localStorage.setItem(
+                  STORAGE_KEY,
+                  JSON.stringify(restoredState),
+                );
                 setState(restoredState);
                 setFocusedPaneId(null);
                 messages.push(t("backup.startupRestoreSuccess"));
               } else {
-                messages.push(t("backup.startupRestoreConfigError", { msg: t("backup.invalidConfig") }));
+                messages.push(
+                  t("backup.startupRestoreConfigError", {
+                    msg: t("backup.invalidConfig"),
+                  }),
+                );
               }
             } else if (result.success) {
               messages.push(
@@ -166,10 +185,14 @@ export function useBackupAndUpdates({
                 code: "FULL_RESTORE_STARTUP_FAILED",
                 severity: "error",
               });
-              messages.push(t("backup.startupRestoreError", { msg: result.message }));
+              messages.push(
+                t("backup.startupRestoreError", { msg: result.message }),
+              );
             }
 
-            (result.warnings ?? []).forEach((warning) => messages.push(warning));
+            (result.warnings ?? []).forEach((warning) =>
+              messages.push(warning),
+            );
             return;
           }
 
@@ -177,7 +200,9 @@ export function useBackupAndUpdates({
         });
 
         if (safeResults.length > 0) {
-          void Promise.resolve(invoke("acknowledge_session_startup_results")).catch((error) => {
+          void Promise.resolve(
+            invoke("acknowledge_session_startup_results"),
+          ).catch((error) => {
             recordDiagnostic({
               component: "restore",
               code: "STARTUP_RESULT_ACK_FAILED",
@@ -234,7 +259,10 @@ export function useBackupAndUpdates({
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
     }
-    const data = (await response.json()) as { tag_name?: string; html_url?: string };
+    const data = (await response.json()) as {
+      tag_name?: string;
+      html_url?: string;
+    };
     const latestTag = data.tag_name?.replace(/^v/, "") ?? "";
     const releaseUrl = data.html_url ?? RELEASES_URL;
 
@@ -373,19 +401,23 @@ export function useBackupAndUpdates({
           setBackupBusy("idle");
           return;
         }
-        await invoke("plugin:fs|write_text_file", { path: filePath, contents: json }).catch(
-          async () => {
-            // tauri-plugin-fs may not be available, fall back to raw command
-            const { writeTextFile } = await import("@tauri-apps/plugin-fs").catch(() => ({
-              writeTextFile: null as null | ((p: string, c: string) => Promise<void>),
-            }));
-            if (writeTextFile) {
-              await writeTextFile(filePath, json);
-              return;
-            }
-            throw new Error(t("backup.fsUnavailable"));
-          },
-        );
+        await invoke("plugin:fs|write_text_file", {
+          path: filePath,
+          contents: json,
+        }).catch(async () => {
+          // tauri-plugin-fs may not be available, fall back to raw command
+          const { writeTextFile } = await import("@tauri-apps/plugin-fs").catch(
+            () => ({
+              writeTextFile: null as
+                null | ((p: string, c: string) => Promise<void>),
+            }),
+          );
+          if (writeTextFile) {
+            await writeTextFile(filePath, json);
+            return;
+          }
+          throw new Error(t("backup.fsUnavailable"));
+        });
       } else {
         const blob = new Blob([json], { type: "application/json" });
         const url = URL.createObjectURL(blob);
@@ -401,7 +433,11 @@ export function useBackupAndUpdates({
         code: "CONFIG_EXPORT_FAILED",
         severity: "error",
       });
-      showAlert(t("backup.exportError", { msg: error instanceof Error ? error.message : String(error) }));
+      showAlert(
+        t("backup.exportError", {
+          msg: error instanceof Error ? error.message : String(error),
+        }),
+      );
     } finally {
       setBackupBusy("idle");
     }
@@ -423,10 +459,11 @@ export function useBackupAndUpdates({
           setBackupBusy("idle");
           return;
         }
-        const { readTextFile, stat } = await import("@tauri-apps/plugin-fs").catch(() => ({
-          readTextFile: null as null | ((p: string) => Promise<string>),
-          stat: null as null | ((p: string) => Promise<{ size: number }>),
-        }));
+        const { readTextFile, stat } =
+          await import("@tauri-apps/plugin-fs").catch(() => ({
+            readTextFile: null as null | ((p: string) => Promise<string>),
+            stat: null as null | ((p: string) => Promise<{ size: number }>),
+          }));
         if (!readTextFile || !stat) throw new Error(t("backup.fsUnavailable"));
         const fileInfo = await stat(filePath);
         if (fileInfo.size > MAX_CONFIG_JSON_BYTES) {
@@ -478,33 +515,40 @@ export function useBackupAndUpdates({
         code: "CONFIG_IMPORT_FAILED",
         severity: "error",
       });
-      showAlert(t("backup.importError", { msg: error instanceof Error ? error.message : String(error) }));
+      showAlert(
+        t("backup.importError", {
+          msg: error instanceof Error ? error.message : String(error),
+        }),
+      );
     } finally {
       setBackupBusy("idle");
     }
   }
 
-  async function exportFullBackup() {
+  async function exportFullBackup(passphrase: string) {
     if (!isTauriRuntime()) {
       showAlert(t("backup.fullDesktopOnly"));
       return;
     }
+    if (!passphrase) {
+      showAlert(t("backup.passwordRequired"));
+      return;
+    }
     setBackupBusy("exporting");
     try {
-      // Rust tự mở hộp thoại lưu và trả về đường dẫn đã chọn (hoặc null nếu
-      // người dùng hủy). Không truyền đường dẫn từ frontend: file backup chứa
-      // cookie session sống nên việc chọn đường dẫn phải nằm ở backend.
+      // The passphrase is sent only with this invoke. Rust closes the child
+      // webviews, writes the encrypted archive immediately, and never stages
+      // the passphrase in a restart request or sidecar file.
       const outputPath = await invoke<string | null>("backup_sessions_zip", {
         configJson: JSON.stringify(state, null, 2),
+        passphrase,
       });
       if (!outputPath) {
-        setBackupBusy("idle");
         return;
       }
-      const configPath = outputPath.replace(/\.zip$/i, ".json");
       setConfirmDialog({
         title: t("backup.backupScheduledTitle"),
-        message: t("backup.backupScheduledMsg", { zip: outputPath, config: configPath }),
+        message: t("backup.backupScheduledMsg", { path: outputPath }),
         confirmLabel: t("backup.restartNow"),
         danger: false,
         onConfirm: restartApp,
@@ -515,66 +559,76 @@ export function useBackupAndUpdates({
         code: "FULL_BACKUP_SCHEDULE_FAILED",
         severity: "error",
       });
+      const message = error instanceof Error ? error.message : String(error);
       showAlert(
-        t("backup.backupError", {
-          msg: error instanceof Error ? error.message : String(error),
-        }),
+        message.startsWith("BACKUP_PASSPHRASE_REQUIRED:")
+          ? t("backup.passwordRequired")
+          : t("backup.backupError", { msg: message }),
       );
     } finally {
       setBackupBusy("idle");
     }
   }
 
-  async function restoreFullBackup() {
+  async function restoreFullBackup(passphrase: string) {
     if (!isTauriRuntime()) {
       showAlert(t("backup.restoreDesktopOnly"));
       return;
     }
-    setBackupBusy("idle");
-    // Xác nhận trước khi thao tác vì restore sẽ thay thế session hiện tại. Rust
-    // sẽ tự mở hộp thoại chọn file khi người dùng đồng ý, trả về đường dẫn đã
-    // chọn (hoặc null nếu hủy) — frontend không còn truyền đường dẫn tùy ý.
-    setConfirmDialog({
-      title: t("backup.restoreTitle"),
-      message: t("backup.restoreMsg"),
-      confirmLabel: t("backup.restore"),
-      danger: true,
-      onConfirm: async () => {
-        setBackupBusy("importing");
-        try {
-          const inputPath = await invoke<string | null>("restore_sessions_zip");
-          if (!inputPath) {
-            setConfirmDialog(null);
-            return;
-          }
-          setConfirmDialog({
-            title: t("backup.restoreSuccessTitle"),
-            message: t("backup.restoreSuccessMsg"),
-            confirmLabel: t("backup.restartNow"),
-            danger: false,
-            onConfirm: restartApp,
-          });
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          if (/restore.*(?:bị hủy|cancelled)|(?:bị hủy|cancelled).*restore/i.test(message)) {
-            setConfirmDialog(null);
-            return;
-          }
-          recordDiagnostic({
-            component: "restore",
-            code: "FULL_RESTORE_STAGE_FAILED",
-            severity: "error",
-          });
-          showAlert(t("backup.restoreError", { msg: message }));
-        } finally {
-          setBackupBusy("idle");
-        }
-      },
-      onCancelWhileBusy: async () => {
-        await invoke("cancel_restore_sessions").catch(() => undefined);
-      },
-      busyLabel: t("backup.restoring"),
-    });
+    setBackupBusy("importing");
+    try {
+      // An empty passphrase is intentionally allowed here for legacy ZIP v1.
+      // Encrypted backups reject it in Rust without touching live sessions.
+      const inputPath = await invoke<string | null>("restore_sessions_zip", {
+        passphrase,
+      });
+      if (!inputPath) return;
+      setConfirmDialog({
+        title: t("backup.restoreSuccessTitle"),
+        message: t("backup.restoreSuccessMsg"),
+        confirmLabel: t("backup.restartNow"),
+        danger: false,
+        onConfirm: restartApp,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (
+        /restore.*(?:bị hủy|cancelled)|(?:bị hủy|cancelled).*restore/i.test(
+          message,
+        )
+      ) {
+        return;
+      }
+      recordDiagnostic({
+        component: "restore",
+        code: "FULL_RESTORE_STAGE_FAILED",
+        severity: "error",
+      });
+      const safeMessage =
+        message.startsWith("BACKUP_AUTH_FAILED:") ||
+        message.startsWith("BACKUP_PASSPHRASE_REQUIRED:") ||
+        message.startsWith("BACKUP_FORMAT_UNSUPPORTED:")
+          ? t("backup.restoreAuthError")
+          : t("backup.restoreError", { msg: message });
+      showAlert(safeMessage);
+    } finally {
+      setBackupBusy("idle");
+    }
+  }
+
+  async function cancelRestoreFullBackup() {
+    if (!isTauriRuntime()) return;
+    try {
+      await invoke("cancel_restore_sessions");
+    } catch (error) {
+      recordDiagnostic({
+        component: "restore",
+        code: "FULL_RESTORE_CANCEL_FAILED",
+        severity: "error",
+      });
+      const message = error instanceof Error ? error.message : String(error);
+      showAlert(t("backup.restoreCancelError", { msg: message }));
+    }
   }
 
   return {
@@ -588,5 +642,6 @@ export function useBackupAndUpdates({
     importConfigJson,
     exportFullBackup,
     restoreFullBackup,
+    cancelRestoreFullBackup,
   };
 }

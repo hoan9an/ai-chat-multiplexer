@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { IconAlertTriangle, IconCheck, IconInfo, IconX } from "../Icons";
 import { useTranslation } from "../i18n";
 import type {
   AlertDialogOptions,
@@ -100,14 +101,38 @@ export function ConfirmDialog({ dialog, onClose }: ConfirmDialogProps) {
 
   return (
     <div
-      className="modal-backdrop"
+      className="modal-backdrop notification-backdrop"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) void handleCancel();
       }}
     >
-      <div className="modal-card">
-        <h3 className="modal-title">{dialog.title}</h3>
-        <p className="modal-message">{dialog.message}</p>
+      <div
+        className={
+          dialog.danger
+            ? "modal-card notification-card danger"
+            : "modal-card notification-card confirm"
+        }
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="confirm-dialog-title"
+        aria-describedby="confirm-dialog-message"
+      >
+        <div className="notification-heading">
+          <span
+            className={dialog.danger ? "notification-icon danger" : "notification-icon confirm"}
+            aria-hidden="true"
+          >
+            {dialog.danger ? <IconAlertTriangle size={18} /> : <IconCheck size={18} />}
+          </span>
+          <div className="notification-copy">
+            <h3 id="confirm-dialog-title" className="modal-title">
+              {dialog.title}
+            </h3>
+            <p id="confirm-dialog-message" className="modal-message">
+              {dialog.message}
+            </p>
+          </div>
+        </div>
         {dialog.details && (
           <pre className="modal-details" aria-label={dialog.title}>
             {dialog.details}
@@ -120,6 +145,7 @@ export function ConfirmDialog({ dialog, onClose }: ConfirmDialogProps) {
               className="modal-btn"
               onClick={() => void handleCancel()}
               disabled={isConfirming && !dialog.onCancelWhileBusy}
+              autoFocus={Boolean(dialog.danger)}
             >
               {dialog.cancelLabel ?? t("common.cancel")}
             </button>
@@ -152,16 +178,46 @@ export function AlertDialog({ dialog, onClose }: AlertDialogProps) {
 
   return (
     <div
-      className="modal-backdrop"
+      className="modal-backdrop notification-backdrop"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <div className="modal-card">
-        <h3 className="modal-title">{dialog.title}</h3>
-        <p className="modal-message">{dialog.message}</p>
-        <div className="modal-actions">
-          <button type="button" className="modal-btn primary" onClick={onClose}>
+      <div
+        className="modal-card notification-card info"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="alert-dialog-title"
+        aria-describedby="alert-dialog-message"
+      >
+        <div className="notification-heading">
+          <span className="notification-icon info" aria-hidden="true">
+            <IconInfo size={18} />
+          </span>
+          <div className="notification-copy">
+            <h3 id="alert-dialog-title" className="modal-title">
+              {dialog.title}
+            </h3>
+            <p id="alert-dialog-message" className="modal-message">
+              {dialog.message}
+            </p>
+          </div>
+          <button
+            type="button"
+            className="notification-close"
+            onClick={onClose}
+            aria-label={t("common.close")}
+          >
+            <IconX size={14} />
+          </button>
+        </div>
+        <div className="modal-actions notification-actions">
+          <button
+            type="button"
+            className="modal-btn primary"
+            onClick={onClose}
+            autoFocus
+          >
             {dialog.confirmLabel ?? t("common.ok")}
           </button>
         </div>

@@ -25,6 +25,7 @@ Evidence location (redacted):
 - A popup that opens `about:blank` and navigates only after creation cannot be
   converted safely into an app tab without a later URL. It is denied and shown
   as an unsupported popup until the provider has a tested fallback.
-- Full backup is not encrypted in format version 1. It requires explicit user
-  consent and must be handled as credential-like private data.
+- New full backups are encrypted with a user passphrase (format v2). Legacy
+  format-v1 ZIP backups remain unencrypted and are accepted only for migration;
+  they must still be handled as credential-like private data.
 - macOS and Linux artifacts are experimental and do not imply support.

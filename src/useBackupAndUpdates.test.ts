@@ -1,5 +1,14 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { act, renderHook, waitFor } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  renderHook,
+  screen,
+  waitFor,
+} from "@testing-library/react";
+import { createElement } from "react";
 import { expectCallWithMessage, nthCallFirstArgString } from "./test-utils";
 import { vi as viDict } from "./i18n/vi";
 import { en as enDict } from "./i18n/en";
@@ -32,7 +41,9 @@ let writeTextFileExportNull = false;
 let readTextFileExportNull = false;
 vi.mock("@tauri-apps/plugin-fs", () => ({
   get writeTextFile() {
-    return writeTextFileExportNull ? null : (p: string, c: string) => writeTextFileSpy(p, c);
+    return writeTextFileExportNull
+      ? null
+      : (p: string, c: string) => writeTextFileSpy(p, c);
   },
   get readTextFile() {
     return readTextFileExportNull ? null : (p: string) => readTextFileSpy(p);
@@ -60,6 +71,7 @@ vi.mock("./appCore", async () => {
 });
 
 import { useBackupAndUpdates } from "./hooks/useBackupAndUpdates";
+import { SettingsModal } from "./components/SettingsModal";
 import type { AppState } from "./appCore";
 import { APP_VERSION, STORAGE_KEY } from "./appCore";
 
@@ -95,7 +107,9 @@ function makeState(): AppState {
 
 interface SetupResult {
   state: AppState;
-  result: ReturnType<typeof renderHook<ReturnType<typeof useBackupAndUpdates>, unknown>>["result"];
+  result: ReturnType<
+    typeof renderHook<ReturnType<typeof useBackupAndUpdates>, unknown>
+  >["result"];
   setStateSpy: ReturnType<typeof vi.fn>;
   setFocusedPaneId: ReturnType<typeof vi.fn>;
   setConfirmDialog: ReturnType<typeof vi.fn>;
@@ -118,7 +132,14 @@ function setupHook(initial?: AppState): SetupResult {
     }),
   );
   invokeSpy.mockClear();
-  return { state, result, setStateSpy, setFocusedPaneId, setConfirmDialog, setAlertDialog };
+  return {
+    state,
+    result,
+    setStateSpy,
+    setFocusedPaneId,
+    setConfirmDialog,
+    setAlertDialog,
+  };
 }
 
 describe("backup/restore product wording", () => {
@@ -144,7 +165,7 @@ describe("backup/restore product wording", () => {
       expected: {
         appState: /trạng thái app/i,
         sessionFiles: /session profile|file session profile/i,
-        originalDevice: /thiết bị cũ/i,
+        deviceScope: /thiết bị này/i,
         replacementRisk: /bị thay thế/i,
         reauth: /đăng nhập lại/i,
       },
@@ -155,7 +176,7 @@ describe("backup/restore product wording", () => {
       expected: {
         appState: /app state/i,
         sessionFiles: /session profiles|profile session files/i,
-        originalDevice: /original device/i,
+        deviceScope: /this device/i,
         replacementRisk: /may be replaced/i,
         reauth: /sign-in again/i,
       },
@@ -166,22 +187,27 @@ describe("backup/restore product wording", () => {
       expected: {
         appState: /应用状态/,
         sessionFiles: /会话配置文件|配置文件会话文件/,
-        originalDevice: /原设备/,
+        deviceScope: /本机/,
         replacementRisk: /可能会被替换/,
         reauth: /重新登录/,
       },
     },
   ];
 
-  it.each(dictionaries)("makes full backup session restore limits explicit in $lang", ({ dict, expected }) => {
-    const fullBackupHelp = fullBackupCopyKeys.map((key) => dict[key]).join("\n");
+  it.each(dictionaries)(
+    "makes full backup session restore limits explicit in $lang",
+    ({ dict, expected }) => {
+      const fullBackupHelp = fullBackupCopyKeys
+        .map((key) => dict[key])
+        .join("\n");
 
-    expect(fullBackupHelp).toMatch(expected.appState);
-    expect(fullBackupHelp).toMatch(expected.sessionFiles);
-    expect(fullBackupHelp).toMatch(expected.originalDevice);
-    expect(fullBackupHelp).toMatch(expected.replacementRisk);
-    expect(fullBackupHelp).toMatch(expected.reauth);
-  });
+      expect(fullBackupHelp).toMatch(expected.appState);
+      expect(fullBackupHelp).toMatch(expected.sessionFiles);
+      expect(fullBackupHelp).toMatch(expected.deviceScope);
+      expect(fullBackupHelp).toMatch(expected.replacementRisk);
+      expect(fullBackupHelp).toMatch(expected.reauth);
+    },
+  );
 
   it("does not describe full backup as guaranteed login preservation", () => {
     const allBackupCopy = dictionaries
@@ -195,7 +221,7 @@ describe("backup/restore product wording", () => {
   });
 });
 
-  describe("useBackupAndUpdates", () => {
+describe("useBackupAndUpdates", () => {
   beforeEach(() => {
     tauriRuntime = false;
     invokeSpy.mockReset();
@@ -208,6 +234,7 @@ describe("backup/restore product wording", () => {
   });
 
   afterEach(() => {
+    cleanup();
     vi.restoreAllMocks();
   });
 
@@ -226,7 +253,14 @@ describe("backup/restore product wording", () => {
                 title: "Restored pane",
                 profileId: "prof-personal",
                 activeTabId: "tab-restored",
-                tabs: [{ id: "tab-restored", title: "Facebook", url: "https://facebook.com", loadedUrl: "https://facebook.com" }],
+                tabs: [
+                  {
+                    id: "tab-restored",
+                    title: "Facebook",
+                    url: "https://facebook.com",
+                    loadedUrl: "https://facebook.com",
+                  },
+                ],
               },
             ],
           },
@@ -247,16 +281,27 @@ describe("backup/restore product wording", () => {
           warnings: [],
         },
       ]);
-      const { result, setStateSpy, setFocusedPaneId, setAlertDialog } = setupHook();
+      const { result, setStateSpy, setFocusedPaneId, setAlertDialog } =
+        setupHook();
 
       expect(result.current.startupRestoreProcessing).toBe(true);
-      await waitFor(() => expect(setStateSpy).toHaveBeenCalledWith(expect.objectContaining({ activeWorkspaceId: "ws-restored" })));
-      await waitFor(() => expect(result.current.startupRestoreProcessing).toBe(false));
+      await waitFor(() =>
+        expect(setStateSpy).toHaveBeenCalledWith(
+          expect.objectContaining({ activeWorkspaceId: "ws-restored" }),
+        ),
+      );
+      await waitFor(() =>
+        expect(result.current.startupRestoreProcessing).toBe(false),
+      );
       expect(setFocusedPaneId).toHaveBeenCalledWith(null);
       expect(setAlertDialog).toHaveBeenCalledWith(
-        expect.objectContaining({ message: expect.stringContaining("Restore hoàn tất") }),
+        expect.objectContaining({
+          message: expect.stringContaining("Restore hoàn tất"),
+        }),
       );
-      expect(JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? "{}")).toMatchObject({
+      expect(
+        JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? "{}"),
+      ).toMatchObject({
         activeWorkspaceId: "ws-restored",
       });
       expect(invokeSpy).toHaveBeenCalledWith(
@@ -267,7 +312,9 @@ describe("backup/restore product wording", () => {
       const ackCall = invokeSpy.mock.calls.findIndex(
         ([command]) => command === "acknowledge_session_startup_results",
       );
-      expect(setStateOrder).toBeLessThan(invokeSpy.mock.invocationCallOrder[ackCall]);
+      expect(setStateOrder).toBeLessThan(
+        invokeSpy.mock.invocationCallOrder[ackCall],
+      );
     });
 
     it("does not replace state when restored config is invalid", async () => {
@@ -284,10 +331,14 @@ describe("backup/restore product wording", () => {
       ]);
       const { result, setStateSpy, setAlertDialog } = setupHook();
 
-      await waitFor(() => expect(result.current.startupRestoreProcessing).toBe(false));
+      await waitFor(() =>
+        expect(result.current.startupRestoreProcessing).toBe(false),
+      );
       expect(setStateSpy).not.toHaveBeenCalled();
       expect(setAlertDialog).toHaveBeenCalledWith(
-        expect.objectContaining({ message: expect.stringContaining("warning text") }),
+        expect.objectContaining({
+          message: expect.stringContaining("warning text"),
+        }),
       );
     });
 
@@ -313,7 +364,9 @@ describe("backup/restore product wording", () => {
 
       const { result, setStateSpy } = setupHook();
 
-      await waitFor(() => expect(result.current.startupRestoreProcessing).toBe(false));
+      await waitFor(() =>
+        expect(result.current.startupRestoreProcessing).toBe(false),
+      );
       expect(setStateSpy).not.toHaveBeenCalled();
       expect(invokeSpy).not.toHaveBeenCalledWith(
         "acknowledge_session_startup_results",
@@ -336,10 +389,14 @@ describe("backup/restore product wording", () => {
       ]);
       const { result, setAlertDialog } = setupHook();
 
-      await waitFor(() => expect(result.current.startupRestoreProcessing).toBe(false));
+      await waitFor(() =>
+        expect(result.current.startupRestoreProcessing).toBe(false),
+      );
       expect(setAlertDialog).toHaveBeenCalledWith(
         expect.objectContaining({
-          message: expect.stringMatching(/ZIP backup tự chứa[\s\S]*simulated sidecar warning/),
+          message: expect.stringMatching(
+            /ZIP backup tự chứa[\s\S]*simulated sidecar warning/,
+          ),
         }),
       );
       const message = setAlertDialog.mock.calls[0][0].message as string;
@@ -347,13 +404,15 @@ describe("backup/restore product wording", () => {
     });
   });
 
-
   describe("checkForUpdates", () => {
     it("returns 'available' when GitHub release tag is newer than APP_VERSION", async () => {
       vi.spyOn(globalThis, "fetch").mockResolvedValue({
         ok: true,
         status: 200,
-        json: async () => ({ tag_name: "v99.0.0", html_url: "https://example/r" }),
+        json: async () => ({
+          tag_name: "v99.0.0",
+          html_url: "https://example/r",
+        }),
       } as Response);
       const { result } = setupHook();
 
@@ -421,7 +480,10 @@ describe("backup/restore product wording", () => {
         await result.current.checkForUpdates();
       });
 
-      expect(result.current.updateStatus).toEqual({ kind: "error", message: "offline" });
+      expect(result.current.updateStatus).toEqual({
+        kind: "error",
+        message: "offline",
+      });
     });
   });
 
@@ -538,7 +600,9 @@ describe("backup/restore product wording", () => {
 
     it("tracks progress through downloading → installing then relaunches", async () => {
       const downloadAndInstall = vi.fn(
-        async (cb: (event: { event: string; data?: Record<string, number> }) => void) => {
+        async (
+          cb: (event: { event: string; data?: Record<string, number> }) => void,
+        ) => {
           cb({ event: "Started", data: { contentLength: 200 } });
           cb({ event: "Progress", data: { chunkLength: 100 } });
           cb({ event: "Progress", data: { chunkLength: 100 } });
@@ -598,7 +662,11 @@ describe("backup/restore product wording", () => {
         await result.current.openReleasePage("https://example/release");
       });
 
-      expect(openSpy).toHaveBeenCalledWith("https://example/release", "_blank", "noopener");
+      expect(openSpy).toHaveBeenCalledWith(
+        "https://example/release",
+        "_blank",
+        "noopener",
+      );
     });
 
     it("invokes plugin:opener|open_url in Tauri runtime", async () => {
@@ -624,7 +692,11 @@ describe("backup/restore product wording", () => {
       await act(async () => {
         await result.current.openReleasePage("https://example/release");
       });
-      expect(openSpy).toHaveBeenCalledWith("https://example/release", "_blank", "noopener");
+      expect(openSpy).toHaveBeenCalledWith(
+        "https://example/release",
+        "_blank",
+        "noopener",
+      );
     });
   });
 
@@ -633,7 +705,9 @@ describe("backup/restore product wording", () => {
       const createObjectURL = vi
         .spyOn(URL, "createObjectURL")
         .mockReturnValue("blob:mock");
-      const revokeObjectURL = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+      const revokeObjectURL = vi
+        .spyOn(URL, "revokeObjectURL")
+        .mockImplementation(() => undefined);
       const clickSpy = vi.fn();
       const realCreate = document.createElement.bind(document);
       vi.spyOn(document, "createElement").mockImplementation((tag: string) => {
@@ -671,7 +745,10 @@ describe("backup/restore product wording", () => {
       await act(async () => {
         await result.current.exportConfigJson();
       });
-      expect(invokeSpy).not.toHaveBeenCalledWith("plugin:fs|write_text_file", expect.anything());
+      expect(invokeSpy).not.toHaveBeenCalledWith(
+        "plugin:fs|write_text_file",
+        expect.anything(),
+      );
       expect(writeTextFileSpy).not.toHaveBeenCalled();
       expect(result.current.backupBusy).toBe("idle");
     });
@@ -700,7 +777,10 @@ describe("backup/restore product wording", () => {
       await act(async () => {
         await result.current.exportConfigJson();
       });
-      expect(writeTextFileSpy).toHaveBeenCalledWith("C:/cfg.json", expect.any(String));
+      expect(writeTextFileSpy).toHaveBeenCalledWith(
+        "C:/cfg.json",
+        expect.any(String),
+      );
       expect(result.current.backupBusy).toBe("idle");
     });
 
@@ -729,7 +809,9 @@ describe("backup/restore product wording", () => {
         await result.current.exportConfigJson();
       });
       expect(setAlertDialog).toHaveBeenCalledWith(
-        expect.objectContaining({ message: expect.stringMatching(/không khả dụng/) }),
+        expect.objectContaining({
+          message: expect.stringMatching(/không khả dụng/),
+        }),
       );
       expect(writeTextFileSpy).not.toHaveBeenCalled();
       expect(result.current.backupBusy).toBe("idle");
@@ -748,9 +830,14 @@ describe("backup/restore product wording", () => {
           (el as HTMLInputElement).click = () => {
             queueMicrotask(() => {
               if (text === null) {
-                Object.defineProperty(el, "files", { value: [], configurable: true });
+                Object.defineProperty(el, "files", {
+                  value: [],
+                  configurable: true,
+                });
               } else {
-                const file = new File([text], "config.json", { type: "application/json" });
+                const file = new File([text], "config.json", {
+                  type: "application/json",
+                });
                 if (options.size !== undefined) {
                   Object.defineProperty(file, "size", {
                     value: options.size,
@@ -760,7 +847,10 @@ describe("backup/restore product wording", () => {
                 if (options.readError) {
                   file.text = () => Promise.reject(options.readError);
                 }
-                Object.defineProperty(el, "files", { value: [file], configurable: true });
+                Object.defineProperty(el, "files", {
+                  value: [file],
+                  configurable: true,
+                });
               }
               el.onchange?.(new Event("change"));
             });
@@ -799,7 +889,8 @@ describe("backup/restore product wording", () => {
         profiles: [{ id: "prof-default", name: "Default" }],
       };
       mockFileInput(JSON.stringify(incoming));
-      const { result, setStateSpy, setConfirmDialog, setFocusedPaneId } = setupHook();
+      const { result, setStateSpy, setConfirmDialog, setFocusedPaneId } =
+        setupHook();
 
       await act(async () => {
         await result.current.importConfigJson();
@@ -827,7 +918,9 @@ describe("backup/restore product wording", () => {
 
       await waitFor(() => expect(setAlertDialog).toHaveBeenCalledTimes(1));
       expect(setAlertDialog).toHaveBeenCalledWith(
-        expect.objectContaining({ message: expect.stringMatching(/Import lỗi/) }),
+        expect.objectContaining({
+          message: expect.stringMatching(/Import lỗi/),
+        }),
       );
       expect(setConfirmDialog).not.toHaveBeenCalled();
       expect(result.current.backupBusy).toBe("idle");
@@ -843,7 +936,11 @@ describe("backup/restore product wording", () => {
 
       await waitFor(() => expect(setAlertDialog).toHaveBeenCalledTimes(1));
       expect(setAlertDialog).toHaveBeenCalledWith(
-        expect.objectContaining({ message: expect.stringMatching(/không có workspaces|workspaces|hợp lệ|lỗi/i) }),
+        expect.objectContaining({
+          message: expect.stringMatching(
+            /không có workspaces|workspaces|hợp lệ|lỗi/i,
+          ),
+        }),
       );
       expect(setConfirmDialog).not.toHaveBeenCalled();
     });
@@ -889,7 +986,9 @@ describe("backup/restore product wording", () => {
 
       await waitFor(() => expect(setAlertDialog).toHaveBeenCalledTimes(1));
       expect(setAlertDialog).toHaveBeenCalledWith(
-        expect.objectContaining({ message: expect.stringMatching(/browser read failed/) }),
+        expect.objectContaining({
+          message: expect.stringMatching(/browser read failed/),
+        }),
       );
       expect(setConfirmDialog).not.toHaveBeenCalled();
       expect(result.current.backupBusy).toBe("idle");
@@ -919,7 +1018,12 @@ describe("backup/restore product wording", () => {
                 profileId: "prof-default",
                 activeTabId: "t",
                 tabs: [
-                  { id: "t", title: "T", url: "https://x", loadedUrl: "https://x" },
+                  {
+                    id: "t",
+                    title: "T",
+                    url: "https://x",
+                    loadedUrl: "https://x",
+                  },
                 ],
               },
             ],
@@ -999,7 +1103,9 @@ describe("backup/restore product wording", () => {
       });
       expect(setConfirmDialog).not.toHaveBeenCalled();
       expect(setAlertDialog).toHaveBeenCalledWith(
-        expect.objectContaining({ message: expect.stringMatching(/không khả dụng/) }),
+        expect.objectContaining({
+          message: expect.stringMatching(/không khả dụng/),
+        }),
       );
       expect(readTextFileSpy).not.toHaveBeenCalled();
       expect(result.current.backupBusy).toBe("idle");
@@ -1011,13 +1117,18 @@ describe("backup/restore product wording", () => {
       const { result, setAlertDialog } = setupHook();
 
       await act(async () => {
-        await result.current.exportFullBackup();
+        await result.current.exportFullBackup("test-passphrase");
       });
 
       expect(setAlertDialog).toHaveBeenCalledWith(
-        expect.objectContaining({ message: expect.stringMatching(/desktop|app/i) }),
+        expect.objectContaining({
+          message: expect.stringMatching(/desktop|app/i),
+        }),
       );
-      expect(invokeSpy).not.toHaveBeenCalled();
+      expect(invokeSpy).not.toHaveBeenCalledWith(
+        "backup_sessions_zip",
+        expect.anything(),
+      );
       expect(result.current.backupBusy).toBe("idle");
     });
 
@@ -1025,13 +1136,18 @@ describe("backup/restore product wording", () => {
       const { result, setAlertDialog } = setupHook();
 
       await act(async () => {
-        await result.current.restoreFullBackup();
+        await result.current.restoreFullBackup("restore-passphrase");
       });
 
       expect(setAlertDialog).toHaveBeenCalledWith(
-        expect.objectContaining({ message: expect.stringMatching(/desktop|app/i) }),
+        expect.objectContaining({
+          message: expect.stringMatching(/desktop|app/i),
+        }),
       );
-      expect(invokeSpy).not.toHaveBeenCalled();
+      expect(invokeSpy).not.toHaveBeenCalledWith(
+        "restore_sessions_zip",
+        expect.anything(),
+      );
       expect(result.current.backupBusy).toBe("idle");
     });
   });
@@ -1048,10 +1164,11 @@ describe("backup/restore product wording", () => {
       invokeSpy.mockResolvedValue(null);
       const { result, setConfirmDialog } = setupHook();
       await act(async () => {
-        await result.current.exportFullBackup();
+        await result.current.exportFullBackup("test-passphrase");
       });
       expect(invokeSpy).toHaveBeenCalledWith("backup_sessions_zip", {
         configJson: expect.stringContaining("workspaces"),
+        passphrase: "test-passphrase",
       });
       expect(setConfirmDialog).not.toHaveBeenCalled();
       expect(result.current.backupBusy).toBe("idle");
@@ -1059,20 +1176,20 @@ describe("backup/restore product wording", () => {
 
     it("invokes backup_sessions_zip with config json and confirms with the Rust-chosen path", async () => {
       // Frontend không còn tự chọn đường dẫn; nó dùng đường dẫn Rust trả về.
-      invokeSpy.mockResolvedValue("C:/tmp/backup.zip");
+      invokeSpy.mockResolvedValue("C:/tmp/backup.acmbak");
       const { result, setConfirmDialog } = setupHook();
       await act(async () => {
-        await result.current.exportFullBackup();
+        await result.current.exportFullBackup("test-passphrase");
       });
       expect(writeTextFileSpy).not.toHaveBeenCalled();
       expect(dialogSave).not.toHaveBeenCalled();
       expect(invokeSpy).toHaveBeenCalledWith("backup_sessions_zip", {
         configJson: expect.stringContaining("workspaces"),
+        passphrase: "test-passphrase",
       });
       const confirmArg = setConfirmDialog.mock.calls[0][0];
-      expect(confirmArg.message).toContain("C:/tmp/backup.zip");
-      expect(confirmArg.message).toContain("C:/tmp/backup.json");
-      expect(confirmArg.title).toEqual(expect.stringContaining("restart"));
+      expect(confirmArg.message).toContain("C:/tmp/backup.acmbak");
+      expect(confirmArg.title).toEqual(expect.stringContaining("Backup"));
       expect(result.current.backupBusy).toBe("idle");
     });
 
@@ -1081,29 +1198,34 @@ describe("backup/restore product wording", () => {
       // Đặt sau setupHook để không bị effect mount (session_startup_results) tiêu thụ.
       invokeSpy.mockRejectedValueOnce(new Error("boom"));
       await act(async () => {
-        await result.current.exportFullBackup();
+        await result.current.exportFullBackup("test-passphrase");
       });
       expect(setAlertDialog).toHaveBeenCalledWith(
-        expect.objectContaining({ message: expect.stringContaining("Backup lỗi") }),
+        expect.objectContaining({
+          message: expect.stringContaining("Backup lỗi"),
+        }),
       );
       expect(result.current.backupBusy).toBe("idle");
     });
 
     it("does not depend on plugin-fs or the JS dialog for full backup", async () => {
       writeTextFileExportNull = true;
-      invokeSpy.mockResolvedValue("C:/tmp/backup.zip");
+      invokeSpy.mockResolvedValue("C:/tmp/backup.acmbak");
       const { result, setConfirmDialog } = setupHook();
       await act(async () => {
-        await result.current.exportFullBackup();
+        await result.current.exportFullBackup("test-passphrase");
       });
       expect(writeTextFileSpy).not.toHaveBeenCalled();
       expect(dialogSave).not.toHaveBeenCalled();
       expect(invokeSpy).toHaveBeenCalledWith("backup_sessions_zip", {
         configJson: expect.stringContaining("workspaces"),
+        passphrase: "test-passphrase",
       });
-      expect(setConfirmDialog).toHaveBeenCalledWith(expect.objectContaining({
-        title: expect.stringContaining("restart"),
-      }));
+      expect(setConfirmDialog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: expect.stringContaining("Backup"),
+        }),
+      );
       expect(result.current.backupBusy).toBe("idle");
     });
 
@@ -1111,12 +1233,28 @@ describe("backup/restore product wording", () => {
       tauriRuntime = false;
       const { result, setAlertDialog } = setupHook();
       await act(async () => {
-        await result.current.exportFullBackup();
+        await result.current.exportFullBackup("test-passphrase");
       });
       expect(setAlertDialog).toHaveBeenCalledWith(
-        expect.objectContaining({ message: expect.stringMatching(/desktop|app/i) }),
+        expect.objectContaining({
+          message: expect.stringMatching(/desktop|app/i),
+        }),
       );
       expect(invokeSpy).not.toHaveBeenCalled();
+    });
+
+    it("rejects an empty export password before invoking Rust", async () => {
+      const { result, setAlertDialog } = setupHook();
+      await act(async () => {
+        await result.current.exportFullBackup("");
+      });
+      expect(invokeSpy).not.toHaveBeenCalledWith(
+        "backup_sessions_zip",
+        expect.anything(),
+      );
+      expect(setAlertDialog).toHaveBeenCalledWith(
+        expect.objectContaining({ message: viDict["backup.passwordRequired"] }),
+      );
     });
   });
 
@@ -1126,58 +1264,134 @@ describe("backup/restore product wording", () => {
       dialogOpen.mockReset();
     });
 
-    it("opens the danger confirm dialog immediately without touching the JS dialog", async () => {
-      const { result, setConfirmDialog } = setupHook();
-      await act(async () => {
-        await result.current.restoreFullBackup();
+    it("clicking Cancel restore reaches the native cancellation command", async () => {
+      let rejectRestore!: (reason: Error) => void;
+      invokeSpy.mockImplementation((cmd: string) => {
+        if (cmd === "restore_sessions_zip") {
+          return new Promise<string | null>((_resolve, reject) => {
+            rejectRestore = reject;
+          });
+        }
+        if (cmd === "cancel_restore_sessions") {
+          rejectRestore(new Error("Restore cancelled"));
+          return Promise.resolve(undefined);
+        }
+        return Promise.resolve([]);
       });
-      expect(dialogOpen).not.toHaveBeenCalled();
-      expect(setConfirmDialog).toHaveBeenCalledTimes(1);
-      expect(setConfirmDialog.mock.calls[0][0]).toEqual(
-        expect.objectContaining({ danger: true }),
+
+      function Harness() {
+        const backup = useBackupAndUpdates({
+          state: makeState(),
+          setState: vi.fn(),
+          setFocusedPaneId: vi.fn(),
+          setConfirmDialog: vi.fn(),
+          setAlertDialog: vi.fn(),
+        });
+        return createElement(SettingsModal, {
+          open: true,
+          onClose: vi.fn(),
+          theme: "light",
+          onThemeChange: vi.fn(),
+          updateStatus: backup.updateStatus,
+          onCheckForUpdates: backup.checkForUpdates,
+          onDownloadAndInstall: backup.downloadAndInstallUpdate,
+          onOpenReleasePage: backup.openReleasePage,
+          backupBusy: backup.backupBusy,
+          onExportConfig: backup.exportConfigJson,
+          onImportConfig: backup.importConfigJson,
+          onExportFullBackup: backup.exportFullBackup,
+          onRestoreFullBackup: backup.restoreFullBackup,
+          onCancelRestoreFullBackup: backup.cancelRestoreFullBackup,
+          onExportSupportBundle: vi.fn(),
+          onOpenSupportIssue: vi.fn(),
+          onOpenKnownIssues: vi.fn(),
+          onShowOnboarding: vi.fn(),
+        });
+      }
+
+      render(createElement(Harness));
+      fireEvent.click(
+        screen.getByRole("button", { name: /Khôi phục từ backup/ }),
       );
-      expect(result.current.backupBusy).toBe("idle");
+      fireEvent.change(screen.getByLabelText("Mật khẩu backup"), {
+        target: { value: "temporary secret" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Restore" }));
+      fireEvent.click(
+        await screen.findByRole("button", { name: "Hủy restore" }),
+      );
+
+      await waitFor(() => {
+        expect(invokeSpy).toHaveBeenCalledWith(
+          "cancel_restore_sessions",
+          undefined,
+        );
+      });
     });
 
-    it("invokes restore_sessions_zip with no path on confirm and shows success on a returned path", async () => {
+    it("invokes restore_sessions_zip with passphrase and shows success on a returned path", async () => {
       // Rust tự mở hộp thoại chọn file và trả về đường dẫn đã chọn.
-      invokeSpy.mockResolvedValue("C:/tmp/in.zip");
+      invokeSpy.mockResolvedValue("C:/tmp/in.acmbak");
       const { result, setConfirmDialog } = setupHook();
       await act(async () => {
-        await result.current.restoreFullBackup();
+        await result.current.restoreFullBackup("restore-passphrase");
       });
       expect(setConfirmDialog).toHaveBeenCalledTimes(1);
-      const dialogArg = setConfirmDialog.mock.calls[0][0];
-      await act(async () => {
-        await dialogArg.onConfirm();
+      expect(invokeSpy).toHaveBeenCalledWith("restore_sessions_zip", {
+        passphrase: "restore-passphrase",
       });
-      expect(invokeSpy).toHaveBeenCalledWith("restore_sessions_zip", undefined);
-      expect(setConfirmDialog).toHaveBeenCalledTimes(2);
-      const successDialog = setConfirmDialog.mock.calls[1][0];
+      const successDialog = setConfirmDialog.mock.calls[0][0];
       expect(successDialog.title).toContain("Restore");
       expect(result.current.backupBusy).toBe("idle");
     });
 
-    it("returns idle without a success dialog when Rust reports cancelled pick (null path)", async () => {
+    it("allows an empty passphrase for legacy ZIP restore", async () => {
       invokeSpy.mockResolvedValue(null);
       const { result, setConfirmDialog } = setupHook();
       await act(async () => {
-        await result.current.restoreFullBackup();
+        await result.current.restoreFullBackup("");
       });
-      const dialogArg = setConfirmDialog.mock.calls[0][0];
-      await act(async () => {
-        await dialogArg.onConfirm();
+      expect(invokeSpy).toHaveBeenCalledWith("restore_sessions_zip", {
+        passphrase: "",
       });
-      expect(invokeSpy).toHaveBeenCalledWith("restore_sessions_zip", undefined);
-      // Dialog xác nhận được đóng, không có dialog thành công.
-      expect(setConfirmDialog).toHaveBeenCalledTimes(2);
-      expect(setConfirmDialog).toHaveBeenLastCalledWith(null);
+      expect(setConfirmDialog).not.toHaveBeenCalled();
       expect(result.current.backupBusy).toBe("idle");
     });
 
-    it("keeps backupBusy importing while confirmed restore is running", async () => {
+    it("invokes cancellation even from a handler captured before restore state rerenders", async () => {
       let resolveRestore!: (value: string | null) => void;
-      const { result, setConfirmDialog } = setupHook();
+      invokeSpy.mockImplementation((cmd: string) => {
+        if (cmd === "restore_sessions_zip") {
+          return new Promise<string | null>((resolve) => {
+            resolveRestore = resolve;
+          });
+        }
+        return Promise.resolve(undefined);
+      });
+      const { result } = setupHook();
+      const cancelCapturedBeforeRestore = result.current.cancelRestoreFullBackup;
+      let restorePromise!: Promise<void>;
+
+      await act(async () => {
+        restorePromise = result.current.restoreFullBackup("restore-passphrase");
+      });
+      await act(async () => {
+        await cancelCapturedBeforeRestore();
+      });
+
+      expect(invokeSpy).toHaveBeenCalledWith(
+        "cancel_restore_sessions",
+        undefined,
+      );
+      await act(async () => {
+        resolveRestore(null);
+        await restorePromise;
+      });
+    });
+
+    it("keeps backupBusy importing while restore is running", async () => {
+      let resolveRestore!: (value: string | null) => void;
+      const { result } = setupHook();
       invokeSpy.mockImplementation((cmd: string) => {
         if (cmd === "restore_sessions_zip") {
           return new Promise<string | null>((resolve) => {
@@ -1187,77 +1401,116 @@ describe("backup/restore product wording", () => {
         return Promise.resolve([]);
       });
 
+      let restorePromise!: Promise<void>;
       await act(async () => {
-        await result.current.restoreFullBackup();
-      });
-      expect(result.current.backupBusy).toBe("idle");
-
-      const dialogArg = setConfirmDialog.mock.calls[0][0];
-      let confirmPromise!: Promise<void>;
-      await act(async () => {
-        confirmPromise = dialogArg.onConfirm();
+        restorePromise = result.current.restoreFullBackup("restore-passphrase");
       });
       expect(result.current.backupBusy).toBe("importing");
 
       await act(async () => {
-        resolveRestore("C:/tmp/in.zip");
-        await confirmPromise;
+        await result.current.cancelRestoreFullBackup();
+      });
+      expect(invokeSpy).toHaveBeenCalledWith(
+        "cancel_restore_sessions",
+        undefined,
+      );
+
+      await act(async () => {
+        resolveRestore("C:/tmp/in.acmbak");
+        await restorePromise;
       });
       expect(result.current.backupBusy).toBe("idle");
     });
 
-    it("dialog onConfirm alerts on invoke error", async () => {
-      const { result, setConfirmDialog, setAlertDialog } = setupHook();
-      await act(async () => {
-        await result.current.restoreFullBackup();
+    it("reports a backend cancellation failure without ending the active restore", async () => {
+      let resolveRestore!: (value: string | null) => void;
+      invokeSpy.mockImplementation((cmd: string) => {
+        if (cmd === "restore_sessions_zip") {
+          return new Promise<string | null>((resolve) => {
+            resolveRestore = resolve;
+          });
+        }
+        if (cmd === "cancel_restore_sessions") {
+          return Promise.reject(new Error("cancel unavailable"));
+        }
+        return Promise.resolve([]);
       });
-      const dialogArg = setConfirmDialog.mock.calls[0][0];
-      invokeSpy.mockRejectedValueOnce(new Error("nope"));
+      const { result, setAlertDialog } = setupHook();
+      let restorePromise!: Promise<void>;
       await act(async () => {
-        await dialogArg.onConfirm();
+        restorePromise = result.current.restoreFullBackup("restore-passphrase");
+      });
+
+      await act(async () => {
+        await result.current.cancelRestoreFullBackup();
       });
       expect(setAlertDialog).toHaveBeenCalledWith(
-        expect.objectContaining({ message: expect.stringContaining("Restore lỗi") }),
+        expect.objectContaining({
+          message: expect.stringContaining("cancel unavailable"),
+        }),
+      );
+      expect(result.current.backupBusy).toBe("importing");
+
+      await act(async () => {
+        resolveRestore(null);
+        await restorePromise;
+      });
+      expect(result.current.backupBusy).toBe("idle");
+    });
+
+    it("shows a generic message for a wrong password or corrupt file", async () => {
+      const { result, setAlertDialog } = setupHook();
+      invokeSpy.mockRejectedValueOnce(new Error("nope"));
+      await act(async () => {
+        await result.current.restoreFullBackup("restore-passphrase");
+      });
+      expect(setAlertDialog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: expect.stringContaining("Restore lỗi"),
+        }),
       );
       expect(result.current.backupBusy).toBe("idle");
+
+      invokeSpy.mockRejectedValueOnce(
+        new Error("BACKUP_AUTH_FAILED: backend details must not reach UI"),
+      );
+      await act(async () => {
+        await result.current.restoreFullBackup("wrong-password");
+      });
+      expect(setAlertDialog).toHaveBeenLastCalledWith(
+        expect.objectContaining({ message: viDict["backup.restoreAuthError"] }),
+      );
+
+      invokeSpy.mockRejectedValueOnce(
+        new Error("BACKUP_FORMAT_UNSUPPORTED: internal parser details"),
+      );
+      await act(async () => {
+        await result.current.restoreFullBackup("restore-passphrase");
+      });
+      expect(setAlertDialog).toHaveBeenLastCalledWith(
+        expect.objectContaining({ message: viDict["backup.restoreAuthError"] }),
+      );
     });
 
     it("treats a user-cancelled restore as cancellation instead of a failure", async () => {
       const { result, setConfirmDialog, setAlertDialog } = setupHook();
-      await act(async () => {
-        await result.current.restoreFullBackup();
-      });
-      const dialogArg = setConfirmDialog.mock.calls[0][0];
       invokeSpy.mockRejectedValueOnce(new Error("Restore đã bị hủy"));
 
       await act(async () => {
-        await dialogArg.onConfirm();
+        await result.current.restoreFullBackup("restore-passphrase");
       });
 
-      expect(setConfirmDialog).toHaveBeenLastCalledWith(null);
+      expect(setConfirmDialog).not.toHaveBeenCalled();
       expect(setAlertDialog).not.toHaveBeenCalled();
       expect(result.current.backupBusy).toBe("idle");
-    });
-
-    it("requests native cancellation from the running restore dialog", async () => {
-      const { result, setConfirmDialog } = setupHook();
-      await act(async () => {
-        await result.current.restoreFullBackup();
-      });
-      const dialogArg = setConfirmDialog.mock.calls[0][0];
-      invokeSpy.mockResolvedValueOnce(undefined);
-
-      await act(async () => {
-        await dialogArg.onCancelWhileBusy();
-      });
-
-      expect(invokeSpy).toHaveBeenCalledWith("cancel_restore_sessions", undefined);
     });
   });
 
   describe("non-Error error coercion (String(error) ternary branches)", () => {
     it("checkForUpdates with non-Error rejection coerces to String (line 86 false branch)", async () => {
-      vi.spyOn(globalThis, "fetch").mockRejectedValue("network down" as unknown as Error);
+      vi.spyOn(globalThis, "fetch").mockRejectedValue(
+        "network down" as unknown as Error,
+      );
       const { result } = setupHook();
       await act(async () => {
         await result.current.checkForUpdates();
@@ -1270,20 +1523,25 @@ describe("backup/restore product wording", () => {
 
     it("exportConfigJson with non-Error coerces to String (line 142 false branch)", async () => {
       const original = URL.createObjectURL;
-      (URL as unknown as { createObjectURL: () => string }).createObjectURL = () => {
-        throw "blob denied"; // non-Error
-      };
+      (URL as unknown as { createObjectURL: () => string }).createObjectURL =
+        () => {
+          throw "blob denied"; // non-Error
+        };
       try {
         const { result, setAlertDialog } = setupHook();
         await act(async () => {
           await result.current.exportConfigJson();
         });
         expect(setAlertDialog).toHaveBeenCalledWith(
-          expect.objectContaining({ message: expect.stringMatching(/blob denied/) }),
+          expect.objectContaining({
+            message: expect.stringMatching(/blob denied/),
+          }),
         );
         expect(result.current.backupBusy).toBe("idle");
       } finally {
-        (URL as unknown as { createObjectURL: typeof original }).createObjectURL = original;
+        (
+          URL as unknown as { createObjectURL: typeof original }
+        ).createObjectURL = original;
       }
     });
 
@@ -1296,7 +1554,9 @@ describe("backup/restore product wording", () => {
         await result.current.importConfigJson();
       });
       expect(setAlertDialog).toHaveBeenCalledWith(
-        expect.objectContaining({ message: expect.stringContaining("read denied") }),
+        expect.objectContaining({
+          message: expect.stringContaining("read denied"),
+        }),
       );
       expect(result.current.backupBusy).toBe("idle");
     });
@@ -1306,27 +1566,27 @@ describe("backup/restore product wording", () => {
       invokeSpy.mockRejectedValue("save denied" as unknown as Error);
       const { result, setAlertDialog } = setupHook();
       await act(async () => {
-        await result.current.exportFullBackup();
+        await result.current.exportFullBackup("test-passphrase");
       });
       expect(setAlertDialog).toHaveBeenCalledWith(
-        expect.objectContaining({ message: expect.stringContaining("save denied") }),
+        expect.objectContaining({
+          message: expect.stringContaining("save denied"),
+        }),
       );
       expect(result.current.backupBusy).toBe("idle");
     });
 
-    it("restoreFullBackup onConfirm with non-Error rejection coerces to String", async () => {
+    it("restoreFullBackup with non-Error rejection coerces to String", async () => {
       tauriRuntime = true;
-      const { result, setConfirmDialog, setAlertDialog } = setupHook();
-      await act(async () => {
-        await result.current.restoreFullBackup();
-      });
-      const dialogArg = setConfirmDialog.mock.calls[0][0];
+      const { result, setAlertDialog } = setupHook();
       invokeSpy.mockRejectedValueOnce("zip rejected" as unknown as Error);
       await act(async () => {
-        await dialogArg.onConfirm();
+        await result.current.restoreFullBackup("restore-passphrase");
       });
       expect(setAlertDialog).toHaveBeenCalledWith(
-        expect.objectContaining({ message: expect.stringContaining("zip rejected") }),
+        expect.objectContaining({
+          message: expect.stringContaining("zip rejected"),
+        }),
       );
     });
   });
@@ -1363,7 +1623,12 @@ describe("backup/restore product wording", () => {
                 profileId: "prof-default",
                 activeTabId: "t",
                 tabs: [
-                  { id: "t", title: "T", url: "https://x", loadedUrl: "https://x" },
+                  {
+                    id: "t",
+                    title: "T",
+                    url: "https://x",
+                    loadedUrl: "https://x",
+                  },
                 ],
               },
             ],
@@ -1401,7 +1666,12 @@ describe("backup/restore product wording", () => {
                 profileId: "missing-prof",
                 activeTabId: "t",
                 tabs: [
-                  { id: "t", title: "T", url: "https://x", loadedUrl: "https://x" },
+                  {
+                    id: "t",
+                    title: "T",
+                    url: "https://x",
+                    loadedUrl: "https://x",
+                  },
                 ],
               },
             ],
@@ -1451,7 +1721,8 @@ describe("backup/restore product wording", () => {
       };
       dialogOpen.mockResolvedValue("C:/cfg.json");
       readTextFileSpy.mockResolvedValue(JSON.stringify(incoming));
-      const { result, setConfirmDialog, setStateSpy, setAlertDialog } = setupHook();
+      const { result, setConfirmDialog, setStateSpy, setAlertDialog } =
+        setupHook();
       await act(async () => {
         await result.current.importConfigJson();
       });
@@ -1474,7 +1745,14 @@ describe("backup/restore product wording", () => {
                 title: "P",
                 profileId: "prof-default",
                 activeTabId: "t",
-                tabs: [{ id: "t", title: "T", url: "https://x", loadedUrl: "https://x" }],
+                tabs: [
+                  {
+                    id: "t",
+                    title: "T",
+                    url: "https://x",
+                    loadedUrl: "https://x",
+                  },
+                ],
               },
             ],
           },
@@ -1488,7 +1766,14 @@ describe("backup/restore product wording", () => {
                 title: "P",
                 profileId: "prof-default",
                 activeTabId: "t",
-                tabs: [{ id: "t-b", title: "T", url: "https://y", loadedUrl: "https://y" }],
+                tabs: [
+                  {
+                    id: "t-b",
+                    title: "T",
+                    url: "https://y",
+                    loadedUrl: "https://y",
+                  },
+                ],
               },
             ],
           },

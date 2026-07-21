@@ -64,7 +64,7 @@ Workspace, pane, tab, profile, theme và layout được lưu cục bộ. App đ
 
 ### Backup và restore
 
-Xuất/nhập cấu hình dạng JSON, hoặc tạo full backup ZIP có thể bao gồm workspace, pane, tab, mapping profile và file session profile. Full backup có thể chứa cookie/session nên cần coi như dữ liệu riêng tư. Restore session là best-effort; các trang được bảo vệ vẫn có thể yêu cầu đăng nhập lại khi đổi máy hoặc đổi Windows user.
+Xuất/nhập cấu hình dạng JSON, hoặc tạo full backup v2 được mã hóa toàn bộ bằng mật khẩu, bao gồm workspace, pane, tab, mapping profile và file session profile. App vẫn đọc backup ZIP v1 cũ để chuyển đổi, nhưng không còn tạo ZIP/JSON sidecar dạng rõ. Dù đã mã hóa, backup vẫn cần được coi là dữ liệu riêng tư; restore session là best-effort và các trang được bảo vệ có thể yêu cầu đăng nhập lại khi đổi máy hoặc Windows user.
 
 ### Sẵn sàng auto-update
 
@@ -92,7 +92,7 @@ AI Chat Multiplexer được thiết kế local-first:
 - website AI bên ngoài chạy trong native desktop webview;
 - browser storage được tách theo profile bằng data directory riêng;
 - trạng thái workspace được lưu cục bộ;
-- full backup có thể bao gồm file session nhạy cảm và cần được bảo vệ tương ứng;
+- full backup v2 được mã hóa bằng mật khẩu nhưng vẫn có thể bao gồm file session nhạy cảm; ZIP v1 cũ không được mã hóa;
 - restore session không giải mã, export hay vượt qua cookie, token, DPAPI, app-bound encryption hoặc cơ chế bảo vệ của website.
 
 Vì đây là desktop app kiểu browser shell, chỉ nên dùng với dịch vụ tin cậy và tránh expose privileged Tauri commands cho web content không tin cậy.

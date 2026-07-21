@@ -50,11 +50,13 @@ export const zh: Dictionary = {
   "onboarding.checkSignIn": "在各 AI 服务中直接登录",
   "onboarding.checkRun": "执行相同任务并比较结果",
   "onboarding.compareThree": "比较 3 个 AI",
-  "onboarding.compareThreeDescription": "在三个窗格中打开 ChatGPT、Claude 和 Gemini。",
+  "onboarding.compareThreeDescription":
+    "在三个窗格中打开 ChatGPT、Claude 和 Gemini。",
   "onboarding.codingReview": "代码审查",
   "onboarding.codingReviewDescription": "在两个窗格中打开 Claude 和 ChatGPT。",
   "onboarding.research": "研究",
-  "onboarding.researchDescription": "在三个窗格中打开 Perplexity、Gemini 和 ChatGPT。",
+  "onboarding.researchDescription":
+    "在三个窗格中打开 Perplexity、Gemini 和 ChatGPT。",
   "onboarding.skip": "跳过",
   "onboarding.showAgain": "再次显示引导",
   "support.reportIssue": "报告问题",
@@ -78,13 +80,12 @@ export const zh: Dictionary = {
 
   // Backup & restore
   "backup.configWord": "配置",
-  "backup.helpMiddle": "保存工作区、窗格、标签页和配置文件。",
+  "backup.helpMiddle": "保存布局和配置文件。",
   "backup.fullBackupWord": "完整备份",
-  "backup.helpEnd":
-    "保存会话配置文件（注意：仅适用于原设备）。",
+  "backup.helpEnd": "保存在本机上的会话。",
   "backup.exportConfig": "导出配置 (.json)",
   "backup.importConfig": "导入配置",
-  "backup.fullBackup": "完整备份 (.zip)",
+  "backup.fullBackup": "加密完整备份 (.acmbak)",
   "backup.restoreBackup": "从备份恢复",
   "backup.desktopOnly": "仅在桌面应用中可用",
   "backup.saveConfigTitle": "保存配置",
@@ -99,9 +100,9 @@ export const zh: Dictionary = {
   "backup.replace": "替换",
   "backup.fullDesktopOnly": "完整备份仅在桌面应用中可用。",
   "backup.saveFullTitle": "保存完整备份",
-  "backup.backupScheduledTitle": "需要重启以完成完整备份",
+  "backup.backupScheduledTitle": "加密备份已完成",
   "backup.backupScheduledMsg":
-    "应用将重启，并在 WebView2 锁定会话文件前创建完整备份：\n• {zip}\n• {config}\n\n换电脑或 Windows 用户时，部分账号可能需要重新登录。",
+    "加密文件已保存到：\n• {path}\n\n为创建一致的备份，会话窗格已关闭。是否立即重启应用？换电脑或 Windows 用户时，部分账号可能需要重新登录。",
   "backup.startupBackupSuccess":
     "备份完成：\n• {zip}\n• {config}\n\n使用 ZIP 恢复；保留 JSON 用于兼容。不要分享这些文件。",
   "backup.startupBackupZipOnly":
@@ -118,22 +119,36 @@ export const zh: Dictionary = {
     "备份完成：\n• {zip}\n• {config}\n\n使用 ZIP 恢复；保留 JSON 用于兼容。不要分享这些文件。",
   "backup.backupError": "备份失败：{msg}",
   "backup.restoreDesktopOnly": "完整恢复仅在桌面应用中可用。",
-  "backup.chooseRestoreTitle": "选择备份 .zip 文件（会话）",
+  "backup.chooseRestoreTitle": "选择 .acmbak 或旧版 .zip 备份",
   "backup.restoreTitle": "恢复完整备份？",
   "backup.restoreMsg":
     "当前配置文件会话文件可能会被替换。换电脑或 Windows 用户时，部分账号可能需要重新登录。应用需要重启才能完全生效。",
   "backup.restore": "恢复",
-  "backup.restoreDone":
-    "已暂存恢复。请关闭并重新打开应用以应用恢复。",
+  "backup.restoreDone": "已暂存恢复。请关闭并重新打开应用以应用恢复。",
   "backup.restoreSuccessTitle": "恢复成功",
   "backup.restoreSuccessMsg":
     "配置文件会话文件已暂存。立即重启应用以应用完整恢复？",
   "backup.restartNow": "立即重启",
   "backup.restartManual": "无法自动重启。请手动关闭并重新打开应用。",
   "backup.restoreError": "恢复失败：{msg}",
-  "backup.unencryptedConsent":
-    "我了解完整备份目前未加密，可能包含登录会话 Cookie/令牌。我会把它作为机密数据保存，并且不会发送给支持人员。",
+  "backup.unencryptedConsent": "新的完整备份始终使用密码加密。",
+  "backup.encryptedNotice": "备份已加密；应用不会保存密码。",
+  "backup.passwordExportTitle": "创建加密完整备份",
+  "backup.passwordRestoreTitle": "打开完整备份",
+  "backup.passwordExportHelp":
+    "为此备份设置专用密码。若忘记密码，文件将无法恢复。",
+  "backup.passwordRestoreHelp":
+    "请输入 .acmbak 文件的密码。仅恢复旧版 ZIP 时可留空。重启后，恢复将替换当前会话。",
+  "backup.passwordLabel": "备份密码",
+  "backup.passwordConfirmLabel": "确认密码",
+  "backup.passwordRequired": "请输入备份密码。",
+  "backup.passwordMismatch": "两次输入的密码不一致。",
+  "backup.createEncrypted": "创建加密备份",
+  "backup.exporting": "正在创建备份…",
+  "backup.restoreAuthError": "无法打开备份。密码错误，或文件已被修改/损坏。",
   "backup.restoring": "正在恢复…",
+  "backup.cancelRestore": "取消恢复",
+  "backup.restoreCancelError": "无法取消恢复：{msg}",
 
   // Pane
   "pane.tabsOf": "{title} 的标签页",
@@ -154,7 +169,8 @@ export const zh: Dictionary = {
   "pane.loading": "Loading",
   "pane.ready": "Ready",
   "pane.webPreview": "Web Preview",
-  "pane.previewNotice": "该网页无法在预览中显示。在桌面应用（Tauri）中，内容将完整显示。",
+  "pane.previewNotice":
+    "该网页无法在预览中显示。在桌面应用（Tauri）中，内容将完整显示。",
   "pane.openInBrowser": "在浏览器中打开",
 
   // Downloads panel
@@ -190,14 +206,15 @@ export const zh: Dictionary = {
   "header.newProfilePlaceholder": "例如：Work、Personal",
   "header.openSettings": "打开设置",
   "header.settings": "设置",
-  "header.brand": "AI Multiplexer",
+  "header.brand": "AI MULTIPLEXER",
 
   // Profile actions (dialogs)
   "profile.renameTitle": "重命名配置文件",
   "profile.newNamePlaceholder": "新名称",
   "profile.inUseTitle": "配置文件正在使用中",
-  "profile.inUseMessage": "该配置文件正在被一个打开的窗格使用。请先关闭该窗格再删除。",
-  "profile.deleteTitle": "删除配置文件 \"{name}\"？",
+  "profile.inUseMessage":
+    "该配置文件正在被一个打开的窗格使用。请先关闭该窗格再删除。",
+  "profile.deleteTitle": '删除配置文件 "{name}"？',
   "profile.deleteMessage": "该配置文件的所有 Cookie 和登录信息将被永久删除。",
 
   // Workspace switcher
@@ -208,6 +225,6 @@ export const zh: Dictionary = {
   "workspace.deleteCurrent": "删除工作区",
   "workspace.paneCount": "{count} 个窗格",
   "workspace.renameTitle": "重命名工作区",
-  "workspace.deleteTitle": "删除工作区 \"{name}\"？",
+  "workspace.deleteTitle": '删除工作区 "{name}"？',
   "workspace.deleteMessage": "其中的所有窗格都将关闭。配置文件和会话将被保留。",
 };

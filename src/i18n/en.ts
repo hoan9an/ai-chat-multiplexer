@@ -40,7 +40,8 @@ export const en: Dictionary = {
     "The bundle contains {count} events plus app version, Windows/architecture, and WebView2. It excludes cookies, tokens, prompts, chat content, full URLs, full paths, and session files. You choose where to save it and whether to share it.",
   "diagnostics.saveTitle": "Save support bundle",
   "diagnostics.exportFailedTitle": "Could not export support bundle",
-  "diagnostics.exportFailed": "The diagnostic file could not be saved. An event code was recorded locally.",
+  "diagnostics.exportFailed":
+    "The diagnostic file could not be saved. An event code was recorded locally.",
 
   // First run and support
   "onboarding.firstRun": "First-run setup",
@@ -50,11 +51,13 @@ export const en: Dictionary = {
   "onboarding.checkSignIn": "Sign in directly on each AI service",
   "onboarding.checkRun": "Run the same task and compare results",
   "onboarding.compareThree": "Compare 3 AI",
-  "onboarding.compareThreeDescription": "ChatGPT, Claude, and Gemini in three panes.",
+  "onboarding.compareThreeDescription":
+    "ChatGPT, Claude, and Gemini in three panes.",
   "onboarding.codingReview": "Coding Review",
   "onboarding.codingReviewDescription": "Claude and ChatGPT in two panes.",
   "onboarding.research": "Research",
-  "onboarding.researchDescription": "Perplexity, Gemini, and ChatGPT in three panes.",
+  "onboarding.researchDescription":
+    "Perplexity, Gemini, and ChatGPT in three panes.",
   "onboarding.skip": "Skip",
   "onboarding.showAgain": "Show onboarding",
   "support.reportIssue": "Report issue",
@@ -78,13 +81,12 @@ export const en: Dictionary = {
 
   // Backup & restore
   "backup.configWord": "Config",
-  "backup.helpMiddle": " saves workspaces, panes, tabs, and profiles. ",
+  "backup.helpMiddle": " saves layouts and profiles. ",
   "backup.fullBackupWord": "Full backup",
-  "backup.helpEnd":
-    " saves session profiles (Note: only applies on the original device).",
+  "backup.helpEnd": " saves sessions on this device.",
   "backup.exportConfig": "Export config (.json)",
   "backup.importConfig": "Import config",
-  "backup.fullBackup": "Full backup (.zip)",
+  "backup.fullBackup": "Encrypted full backup (.acmbak)",
   "backup.restoreBackup": "Restore from backup",
   "backup.desktopOnly": "Only available in the desktop app",
   "backup.saveConfigTitle": "Save config",
@@ -98,12 +100,11 @@ export const en: Dictionary = {
   "backup.replaceConfigMsg":
     "All current workspaces and profiles will be replaced with the contents of the file.",
   "backup.replace": "Replace",
-  "backup.fullDesktopOnly":
-    "Full backup is only available in the desktop app.",
+  "backup.fullDesktopOnly": "Full backup is only available in the desktop app.",
   "backup.saveFullTitle": "Save full backup",
-  "backup.backupScheduledTitle": "Restart required for a complete backup",
+  "backup.backupScheduledTitle": "Encrypted backup complete",
   "backup.backupScheduledMsg":
-    "The app will restart to create a full backup before WebView2 locks session files:\n• {zip}\n• {config}\n\nOn another computer or Windows user, some accounts may need sign-in again.",
+    "The encrypted file was saved to:\n• {path}\n\nSession panes were closed to create a consistent backup. Restart the app now to continue? On another computer or Windows user, some accounts may need sign-in again.",
   "backup.startupBackupSuccess":
     "Backup complete:\n• {zip}\n• {config}\n\nUse the ZIP to restore; keep the JSON for compatibility. Do not share these files.",
   "backup.startupBackupZipOnly":
@@ -119,23 +120,41 @@ export const en: Dictionary = {
   "backup.backupComplete":
     "Backup complete:\n• {zip}\n• {config}\n\nUse the ZIP to restore; keep the JSON for compatibility. Do not share these files.",
   "backup.backupError": "Backup failed: {msg}",
-  "backup.restoreDesktopOnly": "Full restore is only available in the desktop app.",
-  "backup.chooseRestoreTitle": "Choose backup .zip file (sessions)",
+  "backup.restoreDesktopOnly":
+    "Full restore is only available in the desktop app.",
+  "backup.chooseRestoreTitle": "Choose an .acmbak or legacy .zip backup",
   "backup.restoreTitle": "Restore full backup?",
   "backup.restoreMsg":
     "Current profile session files may be replaced. On another computer or Windows user, some accounts may need sign-in again. The app needs to restart to fully apply.",
   "backup.restore": "Restore",
-  "backup.restoreDone":
-    "Restore staged. Close and reopen the app to apply it.",
+  "backup.restoreDone": "Restore staged. Close and reopen the app to apply it.",
   "backup.restoreSuccessTitle": "Restore successful",
   "backup.restoreSuccessMsg":
     "Profile session files are staged. Restart the app now to apply the full restore?",
   "backup.restartNow": "Restart now",
-  "backup.restartManual": "Could not restart automatically. Please close and reopen the app manually.",
+  "backup.restartManual":
+    "Could not restart automatically. Please close and reopen the app manually.",
   "backup.restoreError": "Restore failed: {msg}",
   "backup.unencryptedConsent":
-    "I understand that full backup is currently unencrypted and may contain login-session cookies/tokens. I will store it as secret data and never send it to support.",
+    "New full backups are always password-encrypted.",
+  "backup.encryptedNotice": "Backups are encrypted; the app does not store passwords.",
+  "backup.passwordExportTitle": "Create encrypted full backup",
+  "backup.passwordRestoreTitle": "Open full backup",
+  "backup.passwordExportHelp":
+    "Choose a dedicated password for this backup. The file cannot be recovered if you forget it.",
+  "backup.passwordRestoreHelp":
+    "Enter the password for an .acmbak file. Leave it blank only for a legacy ZIP. Restore replaces current sessions after restart.",
+  "backup.passwordLabel": "Backup password",
+  "backup.passwordConfirmLabel": "Confirm password",
+  "backup.passwordRequired": "Enter a backup password.",
+  "backup.passwordMismatch": "The passwords do not match.",
+  "backup.createEncrypted": "Create encrypted backup",
+  "backup.exporting": "Creating backup…",
+  "backup.restoreAuthError":
+    "The backup could not be opened. The password is incorrect or the file was modified/corrupted.",
   "backup.restoring": "Restoring…",
+  "backup.cancelRestore": "Cancel restore",
+  "backup.restoreCancelError": "Could not cancel restore: {msg}",
 
   // Pane
   "pane.tabsOf": "Tabs of {title}",
@@ -193,15 +212,17 @@ export const en: Dictionary = {
   "header.newProfilePlaceholder": "e.g. Work, Personal",
   "header.openSettings": "Open settings",
   "header.settings": "Settings",
-  "header.brand": "AI Multiplexer",
+  "header.brand": "AI MULTIPLEXER",
 
   // Profile actions (dialogs)
   "profile.renameTitle": "Rename profile",
   "profile.newNamePlaceholder": "New name",
   "profile.inUseTitle": "Profile in use",
-  "profile.inUseMessage": "This profile is being used by an open pane. Close the pane before deleting.",
-  "profile.deleteTitle": "Delete profile \"{name}\"?",
-  "profile.deleteMessage": "All cookies and logins for this profile will be permanently deleted.",
+  "profile.inUseMessage":
+    "This profile is being used by an open pane. Close the pane before deleting.",
+  "profile.deleteTitle": 'Delete profile "{name}"?',
+  "profile.deleteMessage":
+    "All cookies and logins for this profile will be permanently deleted.",
 
   // Workspace switcher
   "workspace.choose": "Choose workspace",
@@ -211,6 +232,7 @@ export const en: Dictionary = {
   "workspace.deleteCurrent": "Delete current",
   "workspace.paneCount": "{count} panes",
   "workspace.renameTitle": "Rename workspace",
-  "workspace.deleteTitle": "Delete workspace \"{name}\"?",
-  "workspace.deleteMessage": "All panes inside will be closed. Profiles and sessions are kept.",
+  "workspace.deleteTitle": 'Delete workspace "{name}"?',
+  "workspace.deleteMessage":
+    "All panes inside will be closed. Profiles and sessions are kept.",
 };

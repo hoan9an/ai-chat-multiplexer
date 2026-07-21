@@ -79,6 +79,7 @@ function DesktopApp() {
     importConfigJson,
     exportFullBackup,
     restoreFullBackup,
+    cancelRestoreFullBackup,
   } = useBackupAndUpdates({
     state,
     setState,
@@ -267,6 +268,7 @@ function DesktopApp() {
         importConfigJson={importConfigJson}
         exportFullBackup={exportFullBackup}
         restoreFullBackup={restoreFullBackup}
+        cancelRestoreFullBackup={cancelRestoreFullBackup}
         exportSupportBundle={exportSupportBundle}
         openSupportIssue={openSupportIssue}
         openKnownIssues={openKnownIssues}

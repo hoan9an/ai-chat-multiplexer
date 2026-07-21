@@ -56,7 +56,7 @@ export function AppWordmark({ height = 20, ...rest }: SVGProps<SVGSVGElement> & 
       height={height}
       viewBox="0 0 192 26"
       fill="none"
-      aria-label="AI Multiplexer"
+      aria-label="AI MULTIPLEXER"
       role="img"
       {...rest}
     >
@@ -76,7 +76,7 @@ export function AppWordmark({ height = 20, ...rest }: SVGProps<SVGSVGElement> & 
         fontWeight="800"
         letterSpacing="-0.7"
       >
-        AI Multiplexer
+        AI MULTIPLEXER
       </text>
     </svg>
   );
@@ -206,6 +206,26 @@ export function IconCheck(props: IconProps) {
   return (
     <svg {...baseProps(props)}>
       <polyline points="20 6 9 17 4 12" />
+    </svg>
+  );
+}
+
+export function IconInfo(props: IconProps) {
+  return (
+    <svg {...baseProps(props)}>
+      <circle cx="12" cy="12" r="9" />
+      <line x1="12" y1="11" x2="12" y2="16" />
+      <line x1="12" y1="8" x2="12.01" y2="8" />
+    </svg>
+  );
+}
+
+export function IconAlertTriangle(props: IconProps) {
+  return (
+    <svg {...baseProps(props)}>
+      <path d="M10.3 3.7 2.2 18a2 2 0 0 0 1.8 3h16a2 2 0 0 0 1.8-3L13.7 3.7a2 2 0 0 0-3.4 0z" />
+      <line x1="12" y1="9" x2="12" y2="13" />
+      <line x1="12" y1="17" x2="12.01" y2="17" />
     </svg>
   );
 }

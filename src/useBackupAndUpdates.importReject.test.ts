@@ -56,7 +56,14 @@ function makeState(): AppState {
             title: "P1",
             profileId: "prof-default",
             activeTabId: "t1",
-            tabs: [{ id: "t1", title: "Tab", url: "https://x", loadedUrl: "https://x" }],
+            tabs: [
+              {
+                id: "t1",
+                title: "Tab",
+                url: "https://x",
+                loadedUrl: "https://x",
+              },
+            ],
           },
         ],
       },
@@ -132,16 +139,21 @@ describe("useBackupAndUpdates — dynamic plugin-fs import rejection", () => {
     invokeSpy.mockResolvedValue("C:/backup.zip");
     const { result, setConfirmDialog } = setupHook();
     await act(async () => {
-      await result.current.exportFullBackup();
+      await result.current.exportFullBackup("test-passphrase");
     });
     expect(invokeSpy).toHaveBeenCalledWith(
       "backup_sessions_zip",
-      expect.objectContaining({ configJson: expect.stringContaining("workspaces") }),
+      expect.objectContaining({
+        configJson: expect.stringContaining("workspaces"),
+        passphrase: "test-passphrase",
+      }),
     );
     expect(dialogSave).not.toHaveBeenCalled();
-    expect(setConfirmDialog).toHaveBeenCalledWith(expect.objectContaining({
-      title: expect.stringContaining("restart"),
-    }));
+    expect(setConfirmDialog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: expect.stringContaining("Backup"),
+      }),
+    );
     expect(result.current.backupBusy).toBe("idle");
   });
 });

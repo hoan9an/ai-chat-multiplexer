@@ -2,7 +2,7 @@
 
 AI Chat Multiplexer is a local-first desktop workspace for running multiple AI web apps side by side. It is built with Tauri 2, React 19, TypeScript, Vite, and a Rust backend that manages native child webviews, per-profile browser session storage, downloads, backups, restores, and desktop updates.
 
-![Status](https://img.shields.io/badge/status-active-success) ![Version](https://img.shields.io/badge/version-0.1.18-blue) ![Tauri](https://img.shields.io/badge/Tauri-2-orange) ![React](https://img.shields.io/badge/React-19-blue) ![License](https://img.shields.io/badge/license-MIT-green)
+![Status](https://img.shields.io/badge/status-active-success) ![Version](https://img.shields.io/badge/version-0.1.19-blue) ![Tauri](https://img.shields.io/badge/Tauri-2-orange) ![React](https://img.shields.io/badge/React-19-blue) ![License](https://img.shields.io/badge/license-MIT-green)
 
 Languages: [English](./README.md) · [Tiếng Việt](./README.vi.md) · [中文](./README.zh.md)
 
@@ -49,7 +49,7 @@ Rust/Tauri backend
   native webview lifecycle
   profile session directories
   native downloads
-  ZIP backup/restore staging
+  encrypted age/TAR backup + legacy ZIP restore staging
   updater/process/dialog/fs/opener plugins
 ```
 
@@ -68,7 +68,8 @@ React owns the workspace model, UI state, layout, and intent. Rust owns privileg
 - Local `newtab.html` page for blank tabs and search/address input behavior.
 - Native download prompts, progress events, toast notifications, and a downloads panel.
 - JSON config export/import for workspace state.
-- Full ZIP backup/restore for profile session files plus app state metadata.
+- Passphrase-encrypted full backup for profile session files plus app state
+  metadata, with legacy ZIP restore compatibility.
 - Signed Tauri updater integration backed by GitHub Releases.
 - Managed HTTP/HTTPS popup routing into a new tab in the source pane/profile.
 - Local redacted diagnostics with user-reviewed support-bundle export.
@@ -156,7 +157,8 @@ Important implementation details:
 - `native_webview_tab_status` polls title, current URL, favicon, and loading state from the child webview, then sanitizes page-provided values before returning them to the privileged app shell.
 - `on_new_window` denies unmanaged native popups. HTTP/HTTPS requests are emitted to the React tab model and inserted after the source tab with the same profile; blank or unsupported schemes are blocked with a visible notice.
 
-The native command surface is registered in `src-tauri/src/lib.rs`:
+The native command surface is implemented in focused Rust modules and
+registered by `src-tauri/src/lib.rs`:
 
 - `native_webview_upsert`
 - `native_webview_hide`
@@ -212,37 +214,57 @@ There are two backup modes.
 
 Config JSON export/import stores only the app model: workspaces, panes, tabs, active workspace, and profiles. It does not include browser session files.
 
-Full ZIP backup is desktop-only. It includes profile session files and app state metadata:
+Full backup is desktop-only. New exports use encrypted format v2: a binary age
+stream containing a TAR payload with profile session files and app-state
+metadata:
 
 ```text
 __ai_chat_multiplexer_backup/app-state.json
 __ai_chat_multiplexer_backup/manifest.json
 ```
 
-Format v1 records the backup format version, app version, creation time, and profile IDs. Restores remain compatible with older archives that have no manifest, but reject malformed manifests and unsupported future format versions before extraction. Archive creation streams regular files, skips symbolic links, writes through a unique temporary file, and atomically replaces an existing output without overwriting unrelated neighboring files.
+The user supplies and confirms a passphrase for each export. Rust streams
+regular files directly through TAR and age encryption, skips symbolic links,
+writes through a unique temporary file, and atomically replaces the selected
+output. It does not create a plaintext archive or JSON sidecar, and the
+passphrase is not persisted in app storage, pending requests, logs, or startup
+results. The app still accepts legacy format-v1 ZIP files for migration.
 
 Restore data entries must be nested under a valid top-level profile ID. Root-level files and unsafe profile-directory names are rejected before a staged restore can replace live session data.
 
-The full backup flow is intentionally restart-oriented because WebView session files can be locked while the app is running:
+Before export, Rust closes the managed child webviews so their profile files are
+released, then creates the encrypted backup in the current process. The app
+should be restarted after export to reopen normal working sessions:
 
-1. Frontend asks Rust to schedule a backup with the current serialized app state.
-2. Rust stores a pending backup request beside the `pane-sessions` directory.
-3. The user restarts the app.
-4. During Tauri setup, Rust processes the pending request before normal operation.
-5. Rust writes the ZIP and a sidecar JSON file for compatibility.
-6. Startup results are surfaced back to the frontend through `session_startup_results`.
+1. The frontend passes the current serialized app state and an in-memory
+   passphrase to the Rust command.
+2. Rust closes managed child webviews and streams the encrypted archive to the
+   path selected in the native save dialog.
+3. Rust finalizes the output atomically; failures remove the partial file.
+4. The user restarts the app to resume normal webview operation.
 
 Restore is also staged:
 
-1. User chooses a backup ZIP.
-2. Rust extracts it into a staging directory and validates safe archive paths.
+1. The user chooses an encrypted v2 backup or a legacy v1 ZIP. A passphrase is
+   required for v2 and ignored for a detected legacy ZIP.
+2. Rust authenticates/decrypts v2 and extracts into a staging directory while
+   validating the complete stream, safe paths, entry types, and size limits.
 3. Rust records pending restore metadata and app config, if present.
 4. On restart, Rust replaces live profile sessions with the staged sessions.
 5. Frontend applies the restored app state when valid.
 
-Only one restore may be pending at a time. Staging can be cancelled, and a failed or cancelled restore removes temporary data without replacing the live session tree. Format v1 limits archives to 10,000 entries, 4 GiB uncompressed total, 512 MiB per file, a 1,100:1 compression ratio, and 10 MiB of app-state metadata.
+Only one restore may be pending at a time. Staging can be cancelled, and a
+wrong passphrase, modified/truncated archive, failed validation, or cancellation
+removes temporary data without replacing the live session tree. Both formats
+are limited to 10,000 entries, 4 GiB of session data, 512 MiB per session file,
+and 10 MiB per metadata file; legacy ZIP also enforces a 1,100:1 compression
+ratio.
 
-Full backups can contain live cookies and session material. Treat them as private credentials. Restore is best-effort; protected services may require sign-in again on another machine or Windows user.
+Full backups can contain live cookies and session material. Encryption protects
+the file at rest, but it should still be handled as private credential-like
+data. A forgotten passphrase cannot be recovered. Restore is best-effort;
+protected services may require sign-in again on another machine or Windows
+user.
 
 ## Downloads
 
@@ -260,7 +282,7 @@ Completed downloads can be opened directly or revealed in the platform file mana
 
 ## Updates And Releases
 
-The app version is currently `0.1.18` in:
+The app version is currently `0.1.19` in:
 
 - `package.json`
 - `src/appCore.ts`
@@ -319,7 +341,12 @@ The app does not proxy, cache, decrypt, or bypass the AI services opened inside 
 ├─ public/                       Static assets served by Vite/Tauri frontend
 │  └─ newtab.html                Internal new-tab page
 ├─ src-tauri/                    Rust backend and Tauri configuration
-│  ├─ src/lib.rs                 Native commands and startup processing
+│  ├─ src/lib.rs                 Tauri builder and command registration
+│  ├─ src/backup_restore.rs      Encrypted backup, legacy restore, startup apply
+│  ├─ src/webviews.rs            Native webview and download commands
+│  ├─ src/session_paths.rs       Profile/session path validation
+│  ├─ src/diagnostics.rs         Runtime diagnostics command
+│  ├─ src/app_commands.rs        App/file-manager commands
 │  ├─ tauri.conf.json            App bundle, CSP, updater endpoint
 │  ├─ capabilities/default.json  Tauri permission set
 │  └─ icons/                     Bundle icons

@@ -474,6 +474,10 @@ p {
   backdrop-filter: blur(2px);
 }
 
+.notification-backdrop {
+  animation: notification-backdrop-in 140ms ease-out both;
+}
+
 .modal-card {
   display: grid;
   width: 100%;
@@ -484,6 +488,147 @@ p {
   border-radius: var(--radius-lg);
   background: var(--surface);
   box-shadow: var(--shadow-lg);
+}
+
+.notification-card {
+  position: relative;
+  max-width: 420px;
+  gap: 16px;
+  padding: 20px;
+  overflow: hidden;
+  border-color: color-mix(in srgb, var(--accent), var(--border) 72%);
+  box-shadow:
+    0 18px 48px rgba(60, 40, 0, 0.18),
+    0 2px 8px rgba(60, 40, 0, 0.08);
+  animation: notification-card-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.notification-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: var(--accent);
+}
+
+.notification-card.danger {
+  border-color: color-mix(in srgb, var(--danger), var(--border) 72%);
+}
+
+.notification-card.danger::before {
+  background: var(--danger);
+}
+
+.notification-heading {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
+}
+
+.notification-card.confirm .notification-heading,
+.notification-card.danger .notification-heading {
+  grid-template-columns: 38px minmax(0, 1fr);
+}
+
+.notification-icon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 10px;
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.notification-icon.danger {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger), transparent 88%);
+}
+
+.notification-copy {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+  padding-top: 1px;
+}
+
+.notification-copy .modal-title {
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+.notification-copy .modal-message {
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.notification-close {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  margin: -3px -4px 0 0;
+  padding: 0;
+  place-items: center;
+  border-color: transparent;
+  color: var(--text-muted);
+  background: transparent;
+}
+
+.notification-close:hover {
+  color: var(--text);
+  background: var(--surface-2);
+  border-color: transparent;
+}
+
+.notification-actions {
+  margin-top: 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+@keyframes notification-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes notification-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .notification-backdrop,
+  .notification-card {
+    animation: none;
+  }
+}
+
+@media (max-width: 520px) {
+  .notification-card {
+    padding: 18px;
+  }
+
+  .notification-heading {
+    grid-template-columns: 34px minmax(0, 1fr) auto;
+    gap: 10px;
+  }
+
+  .notification-card.confirm .notification-heading,
+  .notification-card.danger .notification-heading {
+    grid-template-columns: 34px minmax(0, 1fr);
+  }
+
+  .notification-icon {
+    width: 34px;
+    height: 34px;
+  }
 }
 
 .modal-title {

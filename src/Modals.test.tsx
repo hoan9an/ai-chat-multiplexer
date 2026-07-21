@@ -154,6 +154,8 @@ describe("AlertDialog", () => {
     expect(screen.getByText("Thông báo")).toBeDefined();
     expect(screen.getByText("Xong rồi")).toBeDefined();
     expect(screen.getByRole("button", { name: "OK" })).toBeDefined();
+    expect(screen.getByRole("alertdialog").className).toContain("notification-card");
+    expect(screen.getByRole("button", { name: "Đóng" })).toBeDefined();
   });
 
   it("renders review details when provided", () => {
@@ -239,6 +241,7 @@ describe("ConfirmDialog", () => {
     );
     const btn = screen.getByRole("button", { name: "Xóa" });
     expect(btn.className).toContain("danger");
+    expect(screen.getByRole("dialog").className).toContain("danger");
   });
 
   it("calls onConfirm when confirm button is clicked", async () => {

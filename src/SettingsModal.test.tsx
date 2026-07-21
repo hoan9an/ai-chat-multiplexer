@@ -10,14 +10,19 @@ vi.mock("./appCore", async () => {
   };
 });
 
-import { SettingsModal, type SettingsModalProps } from "./components/SettingsModal";
+import {
+  SettingsModal,
+  type SettingsModalProps,
+} from "./components/SettingsModal";
 
 beforeEach(() => {
   tauriRuntime = false;
 });
 afterEach(cleanup);
 
-function defaultProps(overrides: Partial<SettingsModalProps> = {}): SettingsModalProps {
+function defaultProps(
+  overrides: Partial<SettingsModalProps> = {},
+): SettingsModalProps {
   return {
     open: true,
     onClose: vi.fn(),
@@ -32,6 +37,7 @@ function defaultProps(overrides: Partial<SettingsModalProps> = {}): SettingsModa
     onImportConfig: vi.fn(),
     onExportFullBackup: vi.fn(),
     onRestoreFullBackup: vi.fn(),
+    onCancelRestoreFullBackup: vi.fn(),
     onExportSupportBundle: vi.fn(),
     onOpenSupportIssue: vi.fn(),
     onOpenKnownIssues: vi.fn(),
@@ -42,7 +48,9 @@ function defaultProps(overrides: Partial<SettingsModalProps> = {}): SettingsModa
 
 describe("SettingsModal", () => {
   it("renders nothing when open is false", () => {
-    const { container } = render(<SettingsModal {...defaultProps({ open: false })} />);
+    const { container } = render(
+      <SettingsModal {...defaultProps({ open: false })} />,
+    );
     expect(container.children).toHaveLength(0);
   });
 
@@ -64,7 +72,10 @@ describe("SettingsModal", () => {
     const props = defaultProps();
     const { container } = render(<SettingsModal {...props} />);
     const backdrop = container.querySelector(".modal-backdrop")!;
-    fireEvent.mouseDown(backdrop, { target: backdrop, currentTarget: backdrop });
+    fireEvent.mouseDown(backdrop, {
+      target: backdrop,
+      currentTarget: backdrop,
+    });
     expect(props.onClose).toHaveBeenCalledTimes(1);
   });
 
@@ -101,33 +112,172 @@ describe("SettingsModal", () => {
   it("disables the full-backup buttons in non-Tauri runtime", () => {
     const props = defaultProps();
     render(<SettingsModal {...props} />);
-    const exportBtn = screen.getByRole("button", { name: /Full backup/ }) as HTMLButtonElement;
-    const restoreBtn = screen.getByRole("button", { name: /Khôi phục từ backup/ }) as HTMLButtonElement;
+    const exportBtn = screen.getByRole("button", {
+      name: /Full backup/,
+    }) as HTMLButtonElement;
+    const restoreBtn = screen.getByRole("button", {
+      name: /Khôi phục từ backup/,
+    }) as HTMLButtonElement;
     expect(exportBtn.disabled).toBe(true);
     expect(restoreBtn.disabled).toBe(true);
     expect(exportBtn.title).toBe("Chỉ chạy trong app desktop");
     expect(restoreBtn.title).toBe("Chỉ chạy trong app desktop");
   });
 
-  it("requires explicit privacy consent before enabling full backup in Tauri runtime", () => {
+  it("opens the encrypted backup password form in Tauri runtime", () => {
     tauriRuntime = true;
     const props = defaultProps();
     render(<SettingsModal {...props} />);
-    const exportBtn = screen.getByRole("button", { name: /Full backup/ }) as HTMLButtonElement;
-    const restoreBtn = screen.getByRole("button", { name: /Khôi phục từ backup/ }) as HTMLButtonElement;
-    expect(exportBtn.disabled).toBe(true);
-    expect(restoreBtn.disabled).toBe(false);
-    fireEvent.click(screen.getByRole("checkbox"));
+    const exportBtn = screen.getByRole("button", {
+      name: /Full backup/,
+    }) as HTMLButtonElement;
+    const restoreBtn = screen.getByRole("button", {
+      name: /Khôi phục từ backup/,
+    }) as HTMLButtonElement;
     expect(exportBtn.disabled).toBe(false);
+    expect(restoreBtn.disabled).toBe(false);
+    fireEvent.click(exportBtn);
+    expect(
+      screen.getByRole("heading", { name: "Tạo full backup mã hóa" }),
+    ).toBeDefined();
+    expect(
+      screen.getAllByLabelText(/Mật khẩu backup|Nhập lại mật khẩu/),
+    ).toHaveLength(2);
     expect(exportBtn.hasAttribute("title")).toBe(false);
     expect(restoreBtn.hasAttribute("title")).toBe(false);
+  });
+
+  it("validates export password, passes it once, then clears the inputs", async () => {
+    tauriRuntime = true;
+    let resolveExport!: () => void;
+    const props = defaultProps({
+      onExportFullBackup: vi.fn(
+        () =>
+          new Promise<void>((resolve) => {
+            resolveExport = resolve;
+          }),
+      ),
+    });
+    render(<SettingsModal {...props} />);
+    fireEvent.click(screen.getByRole("button", { name: /Full backup/ }));
+    const password = screen.getByLabelText(
+      "Mật khẩu backup",
+    ) as HTMLInputElement;
+    const confirmation = screen.getByLabelText(
+      "Nhập lại mật khẩu",
+    ) as HTMLInputElement;
+
+    fireEvent.click(screen.getByRole("button", { name: "Tạo backup mã hóa" }));
+    expect(screen.getByRole("alert").textContent).toMatch(/nhập mật khẩu/i);
+
+    fireEvent.change(password, { target: { value: "correct horse" } });
+    fireEvent.change(confirmation, { target: { value: "wrong" } });
+    fireEvent.click(screen.getByRole("button", { name: "Tạo backup mã hóa" }));
+    expect(screen.getByRole("alert").textContent).toMatch(/không khớp/i);
+    expect(props.onExportFullBackup).not.toHaveBeenCalled();
+
+    fireEvent.change(confirmation, { target: { value: "correct horse" } });
+    fireEvent.click(screen.getByRole("button", { name: "Tạo backup mã hóa" }));
+    expect(props.onExportFullBackup).toHaveBeenCalledWith("correct horse");
+    expect(password.disabled).toBe(true);
+    resolveExport();
+
+    await screen.findByRole("button", { name: /Full backup/ });
+    fireEvent.click(screen.getByRole("button", { name: /Full backup/ }));
+    expect(
+      (screen.getByLabelText("Mật khẩu backup") as HTMLInputElement).value,
+    ).toBe("");
+    expect(
+      (screen.getByLabelText("Nhập lại mật khẩu") as HTMLInputElement).value,
+    ).toBe("");
+  });
+
+  it("allows a blank password for legacy ZIP restore and clears on completion", async () => {
+    tauriRuntime = true;
+    const props = defaultProps({
+      onRestoreFullBackup: vi.fn().mockResolvedValue(undefined),
+    });
+    render(<SettingsModal {...props} />);
+    fireEvent.click(
+      screen.getByRole("button", { name: /Khôi phục từ backup/ }),
+    );
+    expect(screen.queryByLabelText("Nhập lại mật khẩu")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Restore" }));
+    expect(props.onRestoreFullBackup).toHaveBeenCalledWith("");
+    await screen.findByRole("button", { name: /Khôi phục từ backup/ });
+    fireEvent.click(
+      screen.getByRole("button", { name: /Khôi phục từ backup/ }),
+    );
+    expect(
+      (screen.getByLabelText("Mật khẩu backup") as HTMLInputElement).value,
+    ).toBe("");
+  });
+
+  it("clears an entered password when the password dialog is cancelled", () => {
+    tauriRuntime = true;
+    const props = defaultProps();
+    render(<SettingsModal {...props} />);
+    fireEvent.click(screen.getByRole("button", { name: /Full backup/ }));
+    fireEvent.change(screen.getByLabelText("Mật khẩu backup"), {
+      target: { value: "temporary secret" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Hủy" }));
+    fireEvent.click(screen.getByRole("button", { name: /Full backup/ }));
+    expect(
+      (screen.getByLabelText("Mật khẩu backup") as HTMLInputElement).value,
+    ).toBe("");
+  });
+
+  it("allows an in-progress restore to be cancelled and clears its password immediately", async () => {
+    tauriRuntime = true;
+    let resolveRestore!: () => void;
+    const props = defaultProps({
+      onRestoreFullBackup: vi.fn(
+        () =>
+          new Promise<void>((resolve) => {
+            resolveRestore = resolve;
+          }),
+      ),
+      onCancelRestoreFullBackup: vi.fn().mockResolvedValue(undefined),
+    });
+    render(<SettingsModal {...props} />);
+    fireEvent.click(
+      screen.getByRole("button", { name: /Khôi phục từ backup/ }),
+    );
+    const password = screen.getByLabelText(
+      "Mật khẩu backup",
+    ) as HTMLInputElement;
+    fireEvent.change(password, { target: { value: "temporary secret" } });
+    fireEvent.click(screen.getByRole("button", { name: "Restore" }));
+
+    const cancel = await screen.findByRole("button", { name: "Hủy restore" });
+    expect((cancel as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(cancel);
+
+    expect(props.onCancelRestoreFullBackup).toHaveBeenCalledTimes(1);
+    expect(password.value).toBe("");
+
+    resolveRestore();
+    await screen.findByRole("button", { name: /Khôi phục từ backup/ });
   });
 
   it("disables config buttons while backupBusy != 'idle'", () => {
     const props = defaultProps({ backupBusy: "exporting" });
     render(<SettingsModal {...props} />);
-    expect((screen.getByRole("button", { name: /Xuất cấu hình/ }) as HTMLButtonElement).disabled).toBe(true);
-    expect((screen.getByRole("button", { name: /Nhập cấu hình/ }) as HTMLButtonElement).disabled).toBe(true);
+    expect(
+      (
+        screen.getByRole("button", {
+          name: /Xuất cấu hình/,
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
+    expect(
+      (
+        screen.getByRole("button", {
+          name: /Nhập cấu hình/,
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
   });
 
   it("shows 'Kiểm tra cập nhật' button when status is idle and triggers callback", () => {
@@ -138,18 +288,34 @@ describe("SettingsModal", () => {
   });
 
   it("shows checking text when updateStatus is checking", () => {
-    render(<SettingsModal {...defaultProps({ updateStatus: { kind: "checking" } })} />);
+    render(
+      <SettingsModal
+        {...defaultProps({ updateStatus: { kind: "checking" } })}
+      />,
+    );
     expect(screen.getByText("Đang kiểm tra…")).toBeDefined();
   });
 
   it("shows current-version notice when updateStatus is current", () => {
-    render(<SettingsModal {...defaultProps({ updateStatus: { kind: "current" } })} />);
-    expect(screen.getByText(/Chưa có bản cập nhật mới hoặc bạn đã ở phiên bản mới nhất/)).toBeDefined();
+    render(
+      <SettingsModal
+        {...defaultProps({ updateStatus: { kind: "current" } })}
+      />,
+    );
+    expect(
+      screen.getByText(
+        /Chưa có bản cập nhật mới hoặc bạn đã ở phiên bản mới nhất/,
+      ),
+    ).toBeDefined();
   });
 
   it("shows release link when updateStatus is available and triggers onOpenReleasePage", () => {
     const props = defaultProps({
-      updateStatus: { kind: "available", latest: "9.9.9", releaseUrl: "https://r" },
+      updateStatus: {
+        kind: "available",
+        latest: "9.9.9",
+        releaseUrl: "https://r",
+      },
     });
     render(<SettingsModal {...props} />);
     expect(screen.getByText(/v9\.9\.9/)).toBeDefined();
@@ -160,7 +326,11 @@ describe("SettingsModal", () => {
   it("shows 'Download & install' and triggers onDownloadAndInstall in Tauri runtime", () => {
     tauriRuntime = true;
     const props = defaultProps({
-      updateStatus: { kind: "available", latest: "9.9.9", releaseUrl: "https://r" },
+      updateStatus: {
+        kind: "available",
+        latest: "9.9.9",
+        releaseUrl: "https://r",
+      },
     });
     render(<SettingsModal {...props} />);
     fireEvent.click(screen.getByRole("button", { name: /Tải & cài đặt/ }));
@@ -171,7 +341,9 @@ describe("SettingsModal", () => {
   it("shows download progress when updateStatus is downloading", () => {
     render(
       <SettingsModal
-        {...defaultProps({ updateStatus: { kind: "downloading", latest: "9.9.9", progress: 42 } })}
+        {...defaultProps({
+          updateStatus: { kind: "downloading", latest: "9.9.9", progress: 42 },
+        })}
       />,
     );
     expect(screen.getByText(/42%/)).toBeDefined();
@@ -180,7 +352,11 @@ describe("SettingsModal", () => {
 
   it("shows installing notice when updateStatus is installing", () => {
     render(
-      <SettingsModal {...defaultProps({ updateStatus: { kind: "installing", latest: "9.9.9" } })} />,
+      <SettingsModal
+        {...defaultProps({
+          updateStatus: { kind: "installing", latest: "9.9.9" },
+        })}
+      />,
     );
     expect(screen.getByText("Đang cài đặt…")).toBeDefined();
   });
@@ -188,7 +364,9 @@ describe("SettingsModal", () => {
   it("shows restarting notice when updateStatus is readyToInstall", () => {
     render(
       <SettingsModal
-        {...defaultProps({ updateStatus: { kind: "readyToInstall", latest: "9.9.9" } })}
+        {...defaultProps({
+          updateStatus: { kind: "readyToInstall", latest: "9.9.9" },
+        })}
       />,
     );
     expect(screen.getByText("Đang khởi động lại…")).toBeDefined();
@@ -196,7 +374,9 @@ describe("SettingsModal", () => {
 
   it("shows error message when updateStatus is error", () => {
     render(
-      <SettingsModal {...defaultProps({ updateStatus: { kind: "error", message: "boom" } })} />,
+      <SettingsModal
+        {...defaultProps({ updateStatus: { kind: "error", message: "boom" } })}
+      />,
     );
     expect(screen.getByText("boom")).toBeDefined();
   });
@@ -238,7 +418,8 @@ describe("SettingsModal", () => {
     fireEvent.click(screen.getByRole("link", { name: "GitHub" }));
 
     expect(props.onOpenReleasePage).toHaveBeenCalledTimes(1);
-    const calls = (props.onOpenReleasePage as ReturnType<typeof vi.fn>).mock.calls;
+    const calls = (props.onOpenReleasePage as ReturnType<typeof vi.fn>).mock
+      .calls;
     expect(calls[0][0]).toMatch(/github\.com/i);
   });
 

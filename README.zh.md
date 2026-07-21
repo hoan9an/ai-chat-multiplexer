@@ -64,7 +64,7 @@ Workspaces、panes、tabs、profiles、theme 和 layout 都存储在本地。这
 
 ### Backup / Restore
 
-支持以 JSON 导出/导入配置，也可以创建 full ZIP backup，包含 workspace、pane、tab、profile 映射和 profile session 文件。Full backup 可能包含 cookie/session，应当作为私密数据保护。Session restore 是 best-effort；跨机器或跨 Windows 用户时，受保护网站仍可能要求重新登录。
+支持以 JSON 导出/导入配置，也可以创建使用口令完整加密的 v2 full backup，其中包含 workspace、pane、tab、profile 映射和 profile session 文件。应用仍可读取旧版 v1 ZIP 以便迁移，但不再创建明文 ZIP/JSON sidecar。即使已加密，full backup 仍应作为私密数据保护；session restore 属于 best-effort，跨机器或跨 Windows 用户时，受保护网站仍可能要求重新登录。
 
 ### 支持 auto-update
 
@@ -92,7 +92,7 @@ AI Chat Multiplexer 采用 local-first 设计：
 - 外部 AI 网站运行在 native desktop webview 中；
 - browser storage 通过独立 data directory 按 profile 隔离；
 - workspace 状态存储在本地；
-- full backup 可能包含敏感 session 文件，应按私密数据处理；
+- full backup v2 使用口令加密但仍可能包含敏感 session 文件；旧版 v1 ZIP 未加密；
 - session restore 不会解密、导出或绕过 cookie、token、DPAPI、app-bound encryption 或网站保护机制。
 
 由于这是 browser-shell 类型的桌面应用，请只使用可信服务，并避免把 privileged Tauri commands 暴露给不可信 web content。
