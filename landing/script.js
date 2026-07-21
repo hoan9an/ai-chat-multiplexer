@@ -4,7 +4,36 @@
 
 document.addEventListener('DOMContentLoaded', () => {
 
-  // ===== 0. OS detection — show platform-specific download =====
+  // ===== 0. Latest public release label — cosmetic, non-blocking =====
+  const releaseLabels = document.querySelectorAll('[data-release-label]');
+  if (releaseLabels.length > 0) {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 4000);
+
+    fetch('https://api.github.com/repos/hoan9an/ai-chat-multiplexer/releases?per_page=10', {
+      headers: { Accept: 'application/vnd.github+json' },
+      signal: controller.signal,
+    })
+      .then(response => {
+        if (!response.ok) throw new Error(`GitHub API returned ${response.status}`);
+        return response.json();
+      })
+      .then(releases => {
+        const latest = Array.isArray(releases)
+          ? releases.find(release => !release.draft && typeof release.tag_name === 'string')
+          : null;
+        if (!latest) return;
+
+        const label = latest.prerelease ? `${latest.tag_name} beta` : latest.tag_name;
+        releaseLabels.forEach(el => { el.textContent = label; });
+      })
+      .catch(() => {
+        // Keep the evergreen "Latest beta" fallback when offline or rate-limited.
+      })
+      .finally(() => window.clearTimeout(timeoutId));
+  }
+
+  // ===== 1. OS detection — show platform-specific download =====
   const ua = navigator.userAgent || '';
   const isWin = /Win(dows|64)/i.test(ua);
   const isMac = /Mac(intosh| OS X)/i.test(ua);
@@ -18,7 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
     else el.style.display = 'none';
   });
 
-  // ===== 1. Navbar scroll effect =====
+  // ===== 2. Navbar scroll effect =====
   const navbar = document.querySelector('.navbar');
   window.addEventListener('scroll', () => {
     if (window.pageYOffset > 50) {
@@ -28,19 +57,25 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // ===== 2. Mobile nav toggle =====
+  // ===== 3. Mobile nav toggle =====
   const navToggle = document.getElementById('navToggle');
   const navLinks = document.getElementById('navLinks');
   if (navToggle && navLinks) {
+    navToggle.setAttribute('aria-expanded', 'false');
+    navToggle.setAttribute('aria-controls', 'navLinks');
     navToggle.addEventListener('click', () => {
       navLinks.classList.toggle('open');
+      navToggle.setAttribute('aria-expanded', String(navLinks.classList.contains('open')));
     });
     navLinks.querySelectorAll('a').forEach(link => {
-      link.addEventListener('click', () => navLinks.classList.remove('open'));
+      link.addEventListener('click', () => {
+        navLinks.classList.remove('open');
+        navToggle.setAttribute('aria-expanded', 'false');
+      });
     });
   }
 
-  // ===== 3. Scroll reveal =====
+  // ===== 4. Scroll reveal =====
   const revealEls = document.querySelectorAll('.reveal');
   const observer = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
@@ -51,7 +86,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
   revealEls.forEach(el => observer.observe(el));
 
-  // ===== 4. Interactive Mockup — Layout switcher =====
+  // ===== 5. Interactive Mockup — Layout switcher =====
   const mockupGrid = document.getElementById('mockupGrid');
   const layoutBtns = document.querySelectorAll('.layout-btn');
 
@@ -67,20 +102,31 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // ===== 5. FAQ accordion =====
-  document.querySelectorAll('.faq-item').forEach(item => {
+  // ===== 6. FAQ accordion =====
+  document.querySelectorAll('.faq-item').forEach((item, index) => {
     const question = item.querySelector('.faq-q');
+    const answer = item.querySelector('.faq-answer');
     if (!question) return;
+    const answerId = `faq-answer-${index + 1}`;
+    if (answer) answer.id = answerId;
+    question.setAttribute('aria-controls', answerId);
+    question.setAttribute('aria-expanded', String(item.classList.contains('active')));
     question.addEventListener('click', () => {
       const wasActive = item.classList.contains('active');
       // Close all
-      document.querySelectorAll('.faq-item').forEach(i => i.classList.remove('active'));
+      document.querySelectorAll('.faq-item').forEach(i => {
+        i.classList.remove('active');
+        i.querySelector('.faq-q')?.setAttribute('aria-expanded', 'false');
+      });
       // Toggle clicked
-      if (!wasActive) item.classList.add('active');
+      if (!wasActive) {
+        item.classList.add('active');
+        question.setAttribute('aria-expanded', 'true');
+      }
     });
   });
 
-  // ===== 6. Smooth scroll for anchor links =====
+  // ===== 7. Smooth scroll for anchor links =====
   document.querySelectorAll('a[href^="#"]').forEach(anchor => {
     anchor.addEventListener('click', function(e) {
       const href = this.getAttribute('href');
@@ -95,7 +141,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // ===== 7. Parallax floating badges on mouse move =====
+  // ===== 8. Parallax floating badges on mouse move =====
   const floatBadges = document.querySelectorAll('.float-badge');
   if (floatBadges.length > 0 && window.innerWidth > 768) {
     const hero = document.querySelector('.hero-visual');
