@@ -41,11 +41,11 @@ The React interface owns the workspace model and layout. The Rust/Tauri backend 
 The two backup modes serve different purposes:
 
 - **Configuration export** stores workspace, pane, tab, and profile definitions only.
-- **Full backup v2** stores app-state metadata and profile session files in a passphrase-encrypted archive.
+- **Full backup** stores app-state metadata and profile session files in a passphrase-encrypted archive.
 
 The app does not store the full-backup passphrase. Keep it somewhere safe: a forgotten passphrase cannot be recovered. A full backup can contain cookies and other sensitive session material, so handle the encrypted file as private data.
 
-Legacy unencrypted v1 ZIP files remain accepted for migration, but the app no longer creates them. Restore is best-effort: protected services may require sign-in again after moving to another device or Windows user.
+Restore is best-effort: protected services may require sign-in again after moving to another device or Windows user.
 
 ## Platform support
 
