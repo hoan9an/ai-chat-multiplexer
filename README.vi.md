@@ -41,11 +41,11 @@ Giao diện React quản lý mô hình workspace và layout. Backend Rust/Tauri 
 Hai chế độ backup phục vụ hai mục đích khác nhau:
 
 - **Xuất cấu hình** chỉ lưu định nghĩa workspace, pane, tab và profile.
-- **Full backup v2** lưu metadata trạng thái ứng dụng và file session của profile trong archive được mã hóa bằng mật khẩu (passphrase).
+- **Full backup** lưu metadata trạng thái ứng dụng và file session của profile trong archive được mã hóa bằng mật khẩu (passphrase).
 
 Ứng dụng không lưu passphrase của full backup. Hãy giữ passphrase ở nơi an toàn vì không thể khôi phục nếu quên. Full backup có thể chứa cookie và dữ liệu session nhạy cảm, vì vậy vẫn phải coi file đã mã hóa là dữ liệu riêng tư.
 
-Ứng dụng vẫn nhận file ZIP v1 cũ không mã hóa để chuyển đổi, nhưng không còn tạo định dạng đó. Restore là best-effort: dịch vụ được bảo vệ có thể yêu cầu đăng nhập lại khi chuyển sang thiết bị hoặc Windows user khác.
+Restore là best-effort: dịch vụ được bảo vệ có thể yêu cầu đăng nhập lại khi chuyển sang thiết bị hoặc Windows user khác.
 
 ## Hỗ trợ nền tảng
 
