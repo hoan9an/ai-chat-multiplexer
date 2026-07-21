@@ -41,11 +41,11 @@ React 界面负责 workspace 模型和布局；Rust/Tauri 后端负责 native ch
 两种 backup 模式用途不同：
 
 - **配置导出**仅保存 workspace、pane、tab 和 profile 定义。
-- **Full backup v2**将应用状态 metadata 和 profile session 文件保存在使用口令（passphrase）加密的 archive 中。
+- **Full backup**将应用状态 metadata 和 profile session 文件保存在使用口令（passphrase）加密的 archive 中。
 
 应用不会保存 full backup 口令。请妥善保管；口令遗失后无法恢复。Full backup 可能包含 cookie 和其他敏感 session 数据，因此即使文件已经加密，也应将其视为私密数据。
 
-应用仍可读取旧版未加密 v1 ZIP 用于迁移，但不会再创建该格式。Restore 属于 best-effort：迁移到另一台设备或另一个 Windows 用户后，受保护服务可能要求重新登录。
+Restore 属于 best-effort：迁移到另一台设备或另一个 Windows 用户后，受保护服务可能要求重新登录。
 
 ## 平台支持
 
