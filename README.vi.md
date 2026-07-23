@@ -2,9 +2,7 @@
 
 Không gian làm việc desktop local-first để chạy nhiều ứng dụng AI web cạnh nhau, đồng thời giữ dự án và phiên trình duyệt ngăn nắp.
 
-[![Bản phát hành mới nhất](https://img.shields.io/github/v/release/hoan9an/ai-chat-multiplexer?display_name=tag&sort=semver)](https://github.com/hoan9an/ai-chat-multiplexer/releases/latest)
 [![CI](https://github.com/hoan9an/ai-chat-multiplexer/actions/workflows/ci.yml/badge.svg)](https://github.com/hoan9an/ai-chat-multiplexer/actions/workflows/ci.yml)
-[![Giấy phép: MIT](https://img.shields.io/github/license/hoan9an/ai-chat-multiplexer)](./LICENSE)
 
 Ngôn ngữ: [English](./README.md) · [Tiếng Việt](./README.vi.md) · [中文](./README.zh.md)
 
@@ -117,7 +115,7 @@ Baseline kỹ thuật được mô tả trong [`docs/technical-baseline.md`](./d
 
 ## Phát hành và phiên bản
 
-README này cố ý không lặp số phiên bản. Badge động và URL `releases/latest` luôn đưa người đọc tới bản đã phát hành mới nhất.
+README này cố ý không lặp số phiên bản. URL `releases/latest` luôn đưa người đọc tới bản đã phát hành mới nhất.
 
 Giá trị phiên bản được duy trì trong `package.json`, `src/appCore.ts`, `src-tauri/Cargo.toml` và `src-tauri/tauri.conf.json`. [`scripts/validate-version-lock.mjs`](./scripts/validate-version-lock.mjs) xác minh các nguồn này khớp với release tag. Xem [release gate runbook](./docs/release/release-gate-runbook.md) để biết quy trình đang được duy trì.
 

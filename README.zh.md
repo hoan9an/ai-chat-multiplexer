@@ -2,9 +2,7 @@
 
 一个 local-first 桌面工作区，可并排运行多个 AI Web 应用，同时有序管理项目与浏览器会话。
 
-[![最新版本](https://img.shields.io/github/v/release/hoan9an/ai-chat-multiplexer?display_name=tag&sort=semver)](https://github.com/hoan9an/ai-chat-multiplexer/releases/latest)
 [![CI](https://github.com/hoan9an/ai-chat-multiplexer/actions/workflows/ci.yml/badge.svg)](https://github.com/hoan9an/ai-chat-multiplexer/actions/workflows/ci.yml)
-[![许可证：MIT](https://img.shields.io/github/license/hoan9an/ai-chat-multiplexer)](./LICENSE)
 
 语言：[English](./README.md) · [Tiếng Việt](./README.vi.md) · [中文](./README.zh.md)
 
@@ -117,7 +115,7 @@ Rust backend ── native child webviews ── 外部 AI 服务
 
 ## 发布与版本管理
 
-本 README 有意不重复版本号。动态 badge 和 `releases/latest` URL 会始终把读者带到当前最新的已发布版本。
+本 README 有意不重复版本号。`releases/latest` URL 会始终把读者带到当前最新的已发布版本。
 
 版本值维护在 `package.json`、`src/appCore.ts`、`src-tauri/Cargo.toml` 和 `src-tauri/tauri.conf.json` 中。[`scripts/validate-version-lock.mjs`](./scripts/validate-version-lock.mjs) 会验证这些来源与 release tag 一致。维护中的流程见 [release gate runbook](./docs/release/release-gate-runbook.md)。
 

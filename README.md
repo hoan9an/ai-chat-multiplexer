@@ -2,9 +2,7 @@
 
 A local-first desktop workspace for running multiple AI web apps side by side while keeping projects and browser sessions organized.
 
-[![Latest release](https://img.shields.io/github/v/release/hoan9an/ai-chat-multiplexer?display_name=tag&sort=semver)](https://github.com/hoan9an/ai-chat-multiplexer/releases/latest)
 [![CI](https://github.com/hoan9an/ai-chat-multiplexer/actions/workflows/ci.yml/badge.svg)](https://github.com/hoan9an/ai-chat-multiplexer/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/github/license/hoan9an/ai-chat-multiplexer)](./LICENSE)
 
 Languages: [English](./README.md) · [Tiếng Việt](./README.vi.md) · [中文](./README.zh.md)
 
@@ -117,7 +115,7 @@ The technical baseline is documented in [`docs/technical-baseline.md`](./docs/te
 
 ## Releases and versioning
 
-The release number is intentionally not repeated in this README. The dynamic badge and `releases/latest` URL always point readers to the current published release.
+The release number is intentionally not repeated in this README. The `releases/latest` URL always points readers to the current published release.
 
 Version values are maintained in `package.json`, `src/appCore.ts`, `src-tauri/Cargo.toml`, and `src-tauri/tauri.conf.json`. [`scripts/validate-version-lock.mjs`](./scripts/validate-version-lock.mjs) verifies that those sources and the release tag agree. See the [release gate runbook](./docs/release/release-gate-runbook.md) for the maintained process.
 
