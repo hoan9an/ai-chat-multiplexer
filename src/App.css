@@ -1270,12 +1270,16 @@ button:focus-visible {
   min-width: 0;
   min-height: 0;
   height: 100%;
-  gap: 6px;
+  /* No gap: the grid interleaves real 6px gutter tracks so the splitters have
+     something to sit in. A gap cannot contain grid items. */
+  gap: 0;
   padding: 6px;
   background: var(--bg);
   overflow: hidden;
 }
 
+/* Fallbacks for when no inline template is applied (focus mode, tests). The
+   inline gridTemplateColumns from the workspace's stored sizes wins otherwise. */
 .split-grid.columns-1 { grid-template-columns: minmax(0, 1fr); }
 .split-grid.columns-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .split-grid.columns-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -1284,6 +1288,69 @@ button:focus-visible {
 .split-grid.focus-mode {
   grid-template-columns: minmax(0, 1fr);
   gap: 0;
+}
+
+/* While a splitter is dragged, panes must not eat the pointer or animate. */
+.split-grid-resizing {
+  cursor: default;
+  user-select: none;
+}
+
+.split-grid-resizing .terminal-pane {
+  transition: none;
+}
+
+/* ============================================================
+   PANE SPLITTER — drag handle inside a gutter track
+   ============================================================ */
+.pane-splitter {
+  position: relative;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  border-radius: 3px;
+  background: transparent;
+  transition: background 120ms ease;
+  touch-action: none;
+}
+
+.pane-splitter-col {
+  cursor: col-resize;
+}
+
+.pane-splitter-row {
+  cursor: row-resize;
+}
+
+.pane-splitter:hover,
+.pane-splitter:focus-visible,
+.pane-splitter-active {
+  background: var(--accent-soft);
+  outline: none;
+}
+
+.pane-splitter-grip {
+  border-radius: 2px;
+  background: var(--border-strong);
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.pane-splitter-col .pane-splitter-grip {
+  width: 2px;
+  height: 28px;
+}
+
+.pane-splitter-row .pane-splitter-grip {
+  width: 28px;
+  height: 2px;
+}
+
+.pane-splitter:hover .pane-splitter-grip,
+.pane-splitter:focus-visible .pane-splitter-grip,
+.pane-splitter-active .pane-splitter-grip {
+  opacity: 1;
+  background: var(--accent);
 }
 
 /* ============================================================
@@ -1478,6 +1545,41 @@ button:focus-visible {
 .icon-button.danger:hover {
   color: var(--danger);
   background: rgba(255, 59, 48, 0.1);
+}
+
+/* ============================================================
+   PANE MENU — per-pane overflow dropdown in the tab strip
+   ============================================================ */
+.pane-menu {
+  position: relative;
+}
+
+.pane-menu summary.pane-menu-trigger {
+  list-style: none;
+  cursor: pointer;
+}
+
+.pane-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.pane-menu-panel {
+  width: 200px;
+}
+
+.pane-menu-panel button[disabled] {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.menu-label {
+  margin: 4px 0 2px;
+  padding: 0 8px;
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
 }
 
 /* ============================================================
@@ -1784,6 +1886,16 @@ button:focus-visible {
 
 .theme-dark .icon-button.danger:hover {
   background: rgba(255, 59, 48, 0.18);
+}
+
+.theme-dark .pane-splitter:hover,
+.theme-dark .pane-splitter:focus-visible,
+.theme-dark .pane-splitter-active {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.theme-dark .pane-splitter-grip {
+  background: rgba(255, 255, 255, 0.24);
 }
 
 /* ============================================================

@@ -31,6 +31,14 @@ export type Workspace = {
   name: string;
   columns: number;
   panes: ChatPane[];
+  /**
+   * Relative widths of the grid columns, as fractions that sum to 1.
+   * Optional: a workspace without stored sizes splits its tracks evenly, so
+   * state written by older versions keeps working without a migration.
+   */
+  colSizes?: number[];
+  /** Relative heights of the grid rows. Same contract as `colSizes`. */
+  rowSizes?: number[];
 };
 
 export type Profile = {
@@ -80,6 +88,8 @@ const MAX_PROFILES = 100;
 const MAX_WORKSPACES = 100;
 const MAX_PANES_PER_WORKSPACE = 100;
 const MAX_TABS_PER_PANE = 100;
+/** Upper bound on stored track-size arrays; the grid never exceeds 4 columns. */
+const MAX_TRACK_SIZES = 100;
 
 import { getNewTabUrl, isNewTabUrl, NEW_TAB_ICON, NEW_TAB_TITLE } from "./newtab";
 
@@ -234,6 +244,113 @@ export function isPaneDragControl(target: EventTarget | null) {
   return target instanceof HTMLElement && Boolean(target.closest("button, input, select, summary, a, [role='button']"));
 }
 
+/**
+ * Smallest fraction a single grid track may shrink to. Keeps a pane wide enough
+ * to still show its tab strip and URL bar, and stops a drag from collapsing a
+ * neighbour to zero width where it could no longer be grabbed back.
+ */
+export const MIN_TRACK_FRACTION = 0.12;
+
+/** Number of grid rows a pane count occupies at the given column count. */
+export function countGridRows(paneCount: number, columns: number): number {
+  if (paneCount <= 0) return 0;
+  return Math.ceil(paneCount / Math.max(1, columns));
+}
+
+/** Even split across `count` tracks. */
+export function createEvenTrackSizes(count: number): number[] {
+  if (count <= 0) return [];
+  return Array.from({ length: count }, () => 1 / count);
+}
+
+function isUsableTrackSizes(sizes: unknown, count: number): sizes is number[] {
+  return (
+    Array.isArray(sizes) &&
+    sizes.length === count &&
+    sizes.every(
+      (size) => typeof size === "number" && Number.isFinite(size) && size >= MIN_TRACK_FRACTION / 2,
+    )
+  );
+}
+
+/**
+ * Coerce stored track sizes into `count` fractions summing to 1. Sizes that are
+ * missing, the wrong length, or non-finite fall back to an even split, so a
+ * layout change (adding a pane, switching column count) never leaves the grid
+ * with a stale template.
+ */
+export function normalizeTrackSizes(sizes: number[] | undefined, count: number): number[] {
+  if (!isUsableTrackSizes(sizes, count)) {
+    return createEvenTrackSizes(count);
+  }
+
+  const total = sizes.reduce((sum, size) => sum + size, 0);
+  if (total <= 0) return createEvenTrackSizes(count);
+  return sizes.map((size) => size / total);
+}
+
+/**
+ * Move the boundary between track `index` and `index + 1` by `delta` (a
+ * fraction of the whole axis). Only the two adjacent tracks change, so dragging
+ * one splitter never disturbs the rest of the grid. Both keep at least
+ * MIN_TRACK_FRACTION.
+ */
+export function resizeTrackSizes(sizes: number[], index: number, delta: number): number[] {
+  if (index < 0 || index + 1 >= sizes.length) return sizes;
+
+  const before = sizes[index];
+  const after = sizes[index + 1];
+  const pairTotal = before + after;
+  const minSize = Math.min(MIN_TRACK_FRACTION, pairTotal / 2);
+  const nextBefore = Math.min(Math.max(before + delta, minSize), pairTotal - minSize);
+
+  if (nextBefore === before) return sizes;
+
+  const next = [...sizes];
+  next[index] = nextBefore;
+  next[index + 1] = pairTotal - nextBefore;
+  return next;
+}
+
+/** Render track fractions as a CSS grid template. */
+export function toGridTemplate(sizes: number[]): string {
+  return sizes.map((size) => `minmax(0, ${size}fr)`).join(" ");
+}
+
+/** Width/height of the gutter track that holds a splitter, in px. */
+export const PANE_GUTTER_PX = 6;
+
+/**
+ * Grid template that interleaves a fixed-width gutter track between each pair of
+ * pane tracks. The gutters are real tracks (rather than `gap`) so a splitter can
+ * be placed inside them — CSS gaps cannot contain grid items.
+ */
+export function toSplitGridTemplate(sizes: number[], gutterPx = PANE_GUTTER_PX): string {
+  return sizes.map((size) => `minmax(0, ${size}fr)`).join(` ${gutterPx}px `);
+}
+
+/** 1-based grid track numbers for the pane at `index`, accounting for gutters. */
+export function getPaneGridPosition(
+  index: number,
+  columns: number,
+): { column: number; row: number } {
+  const safeColumns = Math.max(1, columns);
+  return {
+    column: (index % safeColumns) * 2 + 1,
+    row: Math.floor(index / safeColumns) * 2 + 1,
+  };
+}
+
+/** 1-based grid track number of the gutter after track `index`. */
+export function getGutterTrack(index: number): number {
+  return index * 2 + 2;
+}
+
+/** Total number of grid tracks (panes plus gutters) for `count` pane tracks. */
+export function getTotalTracks(count: number): number {
+  return count <= 0 ? 0 : count * 2 - 1;
+}
+
 export function getNativeWebviewLabel(_paneId: string, tab: ChatTab) {
   // Use ONLY tab.id so the label stays stable when:
   // - the tab is moved between panes (drag tear-out / reorder),
@@ -257,6 +374,25 @@ function isBoundedString(value: unknown, maxLength: number): value is string {
 
 function hasDuplicate<T>(values: T[]): boolean {
   return new Set(values).size !== values.length;
+}
+
+/**
+ * Keep a stored track-size array only when every entry is a usable positive
+ * fraction. Returns undefined for anything else so the caller drops the field
+ * and the grid falls back to an even split.
+ */
+function sanitizeStoredTrackSizes(
+  sizes: unknown,
+  maxLength: number,
+): number[] | undefined {
+  if (!Array.isArray(sizes) || sizes.length === 0 || sizes.length > maxLength) {
+    return undefined;
+  }
+
+  const valid = sizes.every(
+    (size) => typeof size === "number" && Number.isFinite(size) && size > 0,
+  );
+  return valid ? [...(sizes as number[])] : undefined;
 }
 
 export function hydrateTabs(tabs: ChatTab[]): ChatTab[] {
@@ -498,7 +634,17 @@ export function normalizeAppState(parsed: AppState): AppState | null {
       };
     });
 
-    return { ...ws, panes };
+    // Track sizes are cosmetic: bad values are dropped rather than rejecting the
+    // whole workspace, and the grid falls back to an even split.
+    const colSizes = sanitizeStoredTrackSizes(ws.colSizes, MAX_TRACK_SIZES);
+    const rowSizes = sanitizeStoredTrackSizes(ws.rowSizes, MAX_TRACK_SIZES);
+    const normalizedWorkspace: Workspace = { ...ws, panes };
+    if (colSizes) normalizedWorkspace.colSizes = colSizes;
+    else delete normalizedWorkspace.colSizes;
+    if (rowSizes) normalizedWorkspace.rowSizes = rowSizes;
+    else delete normalizedWorkspace.rowSizes;
+
+    return normalizedWorkspace;
   });
 
   if (structurallyBroken || workspaces.some((ws) => ws.panes.length === 0)) {

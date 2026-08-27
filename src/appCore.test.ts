@@ -1,29 +1,40 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   compareVersions,
+  countGridRows,
   createDefaultProfiles,
   createDefaultState,
   createDefaultWorkspace,
+  createEvenTrackSizes,
   createId,
   DEFAULT_PROFILE_ID,
   getDisplayUrl,
   getFallbackTabTitle,
+  getGutterTrack,
   getNativeWebviewLabel,
   getOriginFallbackIcon,
+  getPaneGridPosition,
   getTabKey,
   getTabTitle,
+  getTotalTracks,
   hydrateTabs,
   isAllowedWebviewUrl,
   isPaneDragControl,
   isTauriRuntime,
   loadAppState,
+  MIN_TRACK_FRACTION,
   normalizeAppState,
+  normalizeTrackSizes,
   LEGACY_LAYOUT_KEY,
   LEGACY_STATE_V3_KEY,
   LEGACY_STATE_V4_KEY,
   normalizeUrl,
+  PANE_GUTTER_PX,
+  resizeTrackSizes,
   resolveAddress,
   STORAGE_KEY,
+  toGridTemplate,
+  toSplitGridTemplate,
   type AppState,
   type ChatPane,
   type ChatTab,
@@ -1174,5 +1185,229 @@ describe("normalizeAppState", () => {
       })),
     });
     expect(normalizeAppState(tooManyProfiles)).toBeNull();
+  });
+
+  it("keeps usable stored track sizes", () => {
+    const state = makeState();
+    state.workspaces[0].colSizes = [0.7, 0.3];
+    state.workspaces[0].rowSizes = [1];
+    const normalized = normalizeAppState(state);
+    expect(normalized!.workspaces[0].colSizes).toEqual([0.7, 0.3]);
+    expect(normalized!.workspaces[0].rowSizes).toEqual([1]);
+  });
+
+  it("drops malformed track sizes without discarding the workspace", () => {
+    // Track sizes are cosmetic, so a bad array must degrade to an even split
+    // rather than throw away the panes stored alongside it.
+    const cases: unknown[] = [
+      [],
+      [0.5, "0.5"],
+      [0.5, Number.NaN],
+      [0.5, 0],
+      [0.5, -0.5],
+      "0.5,0.5",
+      Array.from({ length: 101 }, () => 1 / 101),
+    ];
+
+    for (const colSizes of cases) {
+      const state = makeState();
+      state.workspaces[0].colSizes = colSizes as number[];
+      state.workspaces[0].rowSizes = colSizes as number[];
+      const normalized = normalizeAppState(state);
+      expect(normalized).not.toBeNull();
+      expect(normalized!.workspaces[0].panes).toHaveLength(1);
+      expect(normalized!.workspaces[0].colSizes).toBeUndefined();
+      expect(normalized!.workspaces[0].rowSizes).toBeUndefined();
+    }
+  });
+});
+
+describe("countGridRows", () => {
+  it("returns 0 for an empty grid", () => {
+    expect(countGridRows(0, 2)).toBe(0);
+    expect(countGridRows(-1, 2)).toBe(0);
+  });
+
+  it("rounds up partial rows", () => {
+    expect(countGridRows(1, 2)).toBe(1);
+    expect(countGridRows(2, 2)).toBe(1);
+    expect(countGridRows(3, 2)).toBe(2);
+    expect(countGridRows(5, 2)).toBe(3);
+  });
+
+  it("treats a non-positive column count as one column", () => {
+    expect(countGridRows(3, 0)).toBe(3);
+  });
+});
+
+describe("createEvenTrackSizes", () => {
+  it("returns an empty array for a non-positive count", () => {
+    expect(createEvenTrackSizes(0)).toEqual([]);
+    expect(createEvenTrackSizes(-2)).toEqual([]);
+  });
+
+  it("splits the axis evenly and sums to 1", () => {
+    expect(createEvenTrackSizes(1)).toEqual([1]);
+    expect(createEvenTrackSizes(4)).toEqual([0.25, 0.25, 0.25, 0.25]);
+    const three = createEvenTrackSizes(3);
+    expect(three).toHaveLength(3);
+    expect(three.reduce((sum, size) => sum + size, 0)).toBeCloseTo(1);
+  });
+});
+
+describe("normalizeTrackSizes", () => {
+  it("falls back to an even split when sizes are missing", () => {
+    expect(normalizeTrackSizes(undefined, 2)).toEqual([0.5, 0.5]);
+  });
+
+  it("falls back when the stored length no longer matches the track count", () => {
+    // Adding a pane or changing the column count invalidates the stored array.
+    expect(normalizeTrackSizes([0.5, 0.5], 3)).toEqual(createEvenTrackSizes(3));
+    expect(normalizeTrackSizes([0.5, 0.5], 1)).toEqual([1]);
+  });
+
+  it("falls back when any size is non-finite or too small to grab back", () => {
+    expect(normalizeTrackSizes([Number.NaN, 0.5], 2)).toEqual([0.5, 0.5]);
+    expect(normalizeTrackSizes([Number.POSITIVE_INFINITY, 0.5], 2)).toEqual([0.5, 0.5]);
+    expect(normalizeTrackSizes([0.001, 0.999], 2)).toEqual([0.5, 0.5]);
+  });
+
+  it("rescales usable sizes so they sum to 1", () => {
+    expect(normalizeTrackSizes([2, 2], 2)).toEqual([0.5, 0.5]);
+    const scaled = normalizeTrackSizes([3, 1], 2);
+    expect(scaled).toEqual([0.75, 0.25]);
+  });
+
+  it("keeps sizes that already sum to 1", () => {
+    expect(normalizeTrackSizes([0.7, 0.3], 2)).toEqual([0.7, 0.3]);
+  });
+
+  it("returns an empty array for a zero track count", () => {
+    expect(normalizeTrackSizes(undefined, 0)).toEqual([]);
+  });
+});
+
+describe("resizeTrackSizes", () => {
+  it("moves only the two tracks adjacent to the dragged boundary", () => {
+    const next = resizeTrackSizes([0.25, 0.25, 0.5], 0, 0.1);
+    expect(next[0]).toBeCloseTo(0.35);
+    expect(next[1]).toBeCloseTo(0.15);
+    expect(next[2]).toBe(0.5);
+  });
+
+  it("preserves the total of the adjacent pair", () => {
+    const next = resizeTrackSizes([0.4, 0.6], 0, -0.15);
+    expect(next[0] + next[1]).toBeCloseTo(1);
+  });
+
+  it("clamps the dragged track at MIN_TRACK_FRACTION", () => {
+    const shrunk = resizeTrackSizes([0.5, 0.5], 0, -1);
+    expect(shrunk[0]).toBeCloseTo(MIN_TRACK_FRACTION);
+    expect(shrunk[1]).toBeCloseTo(1 - MIN_TRACK_FRACTION);
+  });
+
+  it("clamps the neighbour at MIN_TRACK_FRACTION too", () => {
+    const grown = resizeTrackSizes([0.5, 0.5], 0, 1);
+    expect(grown[1]).toBeCloseTo(MIN_TRACK_FRACTION);
+    expect(grown[0]).toBeCloseTo(1 - MIN_TRACK_FRACTION);
+  });
+
+  it("halves an already-narrow pair instead of refusing to move", () => {
+    // pairTotal < 2 * MIN_TRACK_FRACTION: the clamp becomes pairTotal / 2.
+    const sizes = [0.1, 0.1, 0.8];
+    const next = resizeTrackSizes(sizes, 0, -1);
+    expect(next[0]).toBeCloseTo(0.1);
+    expect(next[1]).toBeCloseTo(0.1);
+  });
+
+  it("returns the same array when nothing moves", () => {
+    const sizes = [0.5, 0.5];
+    expect(resizeTrackSizes(sizes, 0, 0)).toBe(sizes);
+    // Already at the clamp, so a further push is a no-op.
+    const clamped = [MIN_TRACK_FRACTION, 1 - MIN_TRACK_FRACTION];
+    expect(resizeTrackSizes(clamped, 0, -0.1)).toBe(clamped);
+  });
+
+  it("returns the same array for an out-of-range boundary index", () => {
+    const sizes = [0.5, 0.5];
+    expect(resizeTrackSizes(sizes, -1, 0.1)).toBe(sizes);
+    expect(resizeTrackSizes(sizes, 1, 0.1)).toBe(sizes);
+    expect(resizeTrackSizes([1], 0, 0.1)).toEqual([1]);
+  });
+
+  it("never produces a negative track", () => {
+    const next = resizeTrackSizes([0.3, 0.3, 0.4], 1, -5);
+    expect(next.every((size) => size > 0)).toBe(true);
+  });
+});
+
+describe("toGridTemplate", () => {
+  it("renders each fraction as a minmax track", () => {
+    expect(toGridTemplate([0.5, 0.5])).toBe("minmax(0, 0.5fr) minmax(0, 0.5fr)");
+  });
+
+  it("renders an empty template for no tracks", () => {
+    expect(toGridTemplate([])).toBe("");
+  });
+});
+
+describe("toSplitGridTemplate", () => {
+  it("interleaves a gutter track between pane tracks", () => {
+    expect(toSplitGridTemplate([0.7, 0.3])).toBe(
+      `minmax(0, 0.7fr) ${PANE_GUTTER_PX}px minmax(0, 0.3fr)`,
+    );
+  });
+
+  it("adds no gutter for a single track", () => {
+    expect(toSplitGridTemplate([1])).toBe("minmax(0, 1fr)");
+  });
+
+  it("accepts a custom gutter width", () => {
+    expect(toSplitGridTemplate([0.5, 0.5], 10)).toBe(
+      "minmax(0, 0.5fr) 10px minmax(0, 0.5fr)",
+    );
+  });
+});
+
+describe("getPaneGridPosition", () => {
+  it("places panes on odd tracks so gutters stay free", () => {
+    expect(getPaneGridPosition(0, 2)).toEqual({ column: 1, row: 1 });
+    expect(getPaneGridPosition(1, 2)).toEqual({ column: 3, row: 1 });
+    expect(getPaneGridPosition(2, 2)).toEqual({ column: 1, row: 3 });
+    expect(getPaneGridPosition(3, 2)).toEqual({ column: 3, row: 3 });
+  });
+
+  it("flows every pane into one row at a single column", () => {
+    expect(getPaneGridPosition(2, 1)).toEqual({ column: 1, row: 5 });
+  });
+
+  it("treats a non-positive column count as one column", () => {
+    expect(getPaneGridPosition(1, 0)).toEqual({ column: 1, row: 3 });
+  });
+});
+
+describe("getGutterTrack", () => {
+  it("returns the even track that follows each pane track", () => {
+    expect(getGutterTrack(0)).toBe(2);
+    expect(getGutterTrack(1)).toBe(4);
+  });
+
+  it("lines up with the pane tracks on both sides", () => {
+    const gutter = getGutterTrack(0);
+    expect(getPaneGridPosition(0, 2).column).toBe(gutter - 1);
+    expect(getPaneGridPosition(1, 2).column).toBe(gutter + 1);
+  });
+});
+
+describe("getTotalTracks", () => {
+  it("counts panes plus interleaved gutters", () => {
+    expect(getTotalTracks(1)).toBe(1);
+    expect(getTotalTracks(2)).toBe(3);
+    expect(getTotalTracks(4)).toBe(7);
+  });
+
+  it("returns 0 for a non-positive count", () => {
+    expect(getTotalTracks(0)).toBe(0);
+    expect(getTotalTracks(-1)).toBe(0);
   });
 });

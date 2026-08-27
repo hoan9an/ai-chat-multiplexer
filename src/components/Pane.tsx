@@ -3,6 +3,9 @@ import { useEffect, useRef } from "react";
 import {
   IconArrowLeft,
   IconArrowRight,
+  IconChevronDown,
+  IconEdit,
+  IconExternal,
   IconMaximize,
   IconMinimize,
   IconPlus,
@@ -55,7 +58,12 @@ export interface PaneProps {
   pane: ChatPane;
   index: number;
   paneProfile: Profile | undefined;
+  profiles: Profile[];
   activePanes: ChatPane[];
+
+  /** Explicit grid placement; undefined in focus mode, where the grid is 1x1. */
+  gridColumn?: number;
+  gridRow?: number;
 
   // UI state
   isFocused: boolean;
@@ -64,6 +72,7 @@ export interface PaneProps {
   draggingTabKey: string | null;
   tabDragOver: TabDragOver;
   editingUrls: Record<string, string>;
+  isMenuOpen: boolean;
 
   // Refs
   paneDrag: PaneDragRef;
@@ -79,6 +88,7 @@ export interface PaneProps {
   setEditingUrls: (
     updater: (current: Record<string, string>) => Record<string, string>,
   ) => void;
+  setMenuOpen: (open: boolean) => void;
 
   // Actions
   addTab: (paneId: string) => void;
@@ -108,19 +118,32 @@ export interface PaneProps {
     before: boolean,
   ) => void;
   detachTabToNewPane: (sourcePaneId: string, sourceTabId: string) => void;
+
+  // Pane-level actions surfaced in the pane overflow menu
+  renamePane: (paneId: string) => void;
+  duplicatePane: (paneId: string) => void;
+  splitPane: (paneId: string) => void;
+  movePaneProfile: (paneId: string, profileId: string) => void;
+  copyActiveTabUrl: (paneId: string) => void;
+  openActiveTabExternally: (paneId: string) => void;
+  resetTrackSizes: () => void;
 }
 
 export function Pane({
   pane,
   index,
   paneProfile,
+  profiles,
   activePanes,
+  gridColumn,
+  gridRow,
   isFocused,
   focusedPaneId,
   dragOverPaneId,
   draggingTabKey,
   tabDragOver,
   editingUrls,
+  isMenuOpen,
   paneDrag,
   tabDrag,
   registerShellRef,
@@ -130,6 +153,7 @@ export function Pane({
   setDraggingTabKey,
   setTabDragOver,
   setEditingUrls,
+  setMenuOpen,
   addTab,
   removeTab,
   removePane,
@@ -142,6 +166,13 @@ export function Pane({
   moveTabWithinPane,
   moveTabAcrossPanes,
   detachTabToNewPane,
+  renamePane,
+  duplicatePane,
+  splitPane,
+  movePaneProfile,
+  copyActiveTabUrl,
+  openActiveTabExternally,
+  resetTrackSizes,
 }: PaneProps) {
   const { t, lang } = useTranslation();
   // Set synchronously before blur() when the user cancels URL editing (Escape).
@@ -157,6 +188,13 @@ export function Pane({
   const activeTabKey = getTabKey(pane.id, activeTab.id);
   const activeAddressValue = editingUrls[activeTabKey] ?? activeDisplayUrl;
   const frameRef = useRef<HTMLIFrameElement | null>(null);
+  const otherProfiles = profiles.filter((profile) => profile.id !== pane.profileId);
+
+  /** Menu items are one-shot: run the action and close the dropdown. */
+  function runPaneMenuAction(action: () => void) {
+    setMenuOpen(false);
+    action();
+  }
 
   useEffect(() => {
     function handleNewTabNavigate(event: MessageEvent) {
@@ -207,6 +245,7 @@ export function Pane({
       }`}
       key={pane.id}
       data-pane-id={pane.id}
+      style={gridColumn && gridRow ? { gridColumn, gridRow } : undefined}
     >
       <nav
         className="tab-strip"
@@ -491,6 +530,78 @@ export function Pane({
           >
             <IconPlus size={13} />
           </button>
+          <details
+            className="pane-menu"
+            open={isMenuOpen}
+            onToggle={(event) => setMenuOpen(event.currentTarget.open)}
+          >
+            <summary
+              className="icon-button pane-menu-trigger"
+              aria-label={t("pane.menu")}
+              title={t("pane.menu")}
+            >
+              <IconChevronDown size={13} />
+            </summary>
+            <div className="preset-menu pane-menu-panel">
+              <button type="button" onClick={() => runPaneMenuAction(() => renamePane(pane.id))}>
+                <IconEdit size={11} />
+                <span>{t("pane.rename")}</span>
+              </button>
+              <button type="button" onClick={() => runPaneMenuAction(() => splitPane(pane.id))}>
+                <IconPlus size={11} />
+                <span>{t("pane.split")}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => runPaneMenuAction(() => duplicatePane(pane.id))}
+              >
+                <IconMaximize size={11} />
+                <span>{t("pane.duplicate")}</span>
+              </button>
+              <div className="menu-separator" role="separator" />
+              <button
+                type="button"
+                disabled={!activeDisplayUrl}
+                onClick={() => runPaneMenuAction(() => copyActiveTabUrl(pane.id))}
+              >
+                <IconEdit size={11} />
+                <span>{t("pane.copyUrl")}</span>
+              </button>
+              <button
+                type="button"
+                disabled={!activeDisplayUrl}
+                onClick={() => runPaneMenuAction(() => openActiveTabExternally(pane.id))}
+              >
+                <IconExternal size={11} />
+                <span>{t("pane.openExternal")}</span>
+              </button>
+              <div className="menu-separator" role="separator" />
+              <button type="button" onClick={() => runPaneMenuAction(resetTrackSizes)}>
+                <IconRefresh size={11} />
+                <span>{t("pane.resetSizes")}</span>
+              </button>
+              {otherProfiles.length > 0 && (
+                <>
+                  <div className="menu-separator" role="separator" />
+                  <p className="menu-label">{t("pane.moveToProfile")}</p>
+                  {otherProfiles.map((profile) => (
+                    <button
+                      key={profile.id}
+                      type="button"
+                      onClick={() =>
+                        runPaneMenuAction(() => movePaneProfile(pane.id, profile.id))
+                      }
+                    >
+                      <span className="profile-dot" aria-hidden="true">
+                        ●
+                      </span>
+                      <span>{profile.name}</span>
+                    </button>
+                  ))}
+                </>
+              )}
+            </div>
+          </details>
           <button
             className="icon-button"
             onClick={() => setFocusedPaneId(isFocused ? null : pane.id)}

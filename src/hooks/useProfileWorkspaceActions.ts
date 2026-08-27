@@ -27,6 +27,7 @@ export interface ProfileWorkspaceActions {
   getProfileById: (profileId: string) => Profile | undefined;
   ensureProfileWithName: (profileName: string) => Profile;
   renameProfile: (profileId: string) => void;
+  renamePane: (paneId: string) => void;
   deleteProfile: (profileId: string) => void;
   switchWorkspace: (workspaceId: string) => void;
   createWorkspace: () => void;
@@ -111,6 +112,25 @@ export function useProfileWorkspaceActions({
               };
             }),
           })),
+        }));
+      },
+    });
+  }
+
+  function renamePane(paneId: string) {
+    const pane = activeWorkspace.panes.find((candidate) => candidate.id === paneId);
+    if (!pane) return;
+    openTextPrompt({
+      title: t("pane.renameTitle"),
+      initial: pane.title,
+      placeholder: t("pane.newTitlePlaceholder"),
+      onSubmit: (next) => {
+        if (next === pane.title) return;
+        updateActiveWorkspace((workspace) => ({
+          ...workspace,
+          panes: workspace.panes.map((candidate) =>
+            candidate.id === paneId ? { ...candidate, title: next } : candidate,
+          ),
         }));
       },
     });
@@ -213,6 +233,7 @@ export function useProfileWorkspaceActions({
     getProfileById,
     ensureProfileWithName,
     renameProfile,
+    renamePane,
     deleteProfile,
     switchWorkspace,
     createWorkspace,

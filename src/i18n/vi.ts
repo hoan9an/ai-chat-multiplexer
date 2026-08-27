@@ -182,6 +182,18 @@ export const vi = {
   "pane.previewNotice":
     "Trang web không hiển thị được trong bản xem trước. Trên app desktop (Tauri), nội dung sẽ hiển thị đầy đủ.",
   "pane.openInBrowser": "Mở bằng trình duyệt",
+  "pane.resizeColumns": "Kéo để đổi độ rộng cột {index}",
+  "pane.resizeRows": "Kéo để đổi độ cao hàng {index}",
+  "pane.menu": "Tùy chọn pane",
+  "pane.rename": "Đổi tên pane",
+  "pane.renameTitle": "Đổi tên pane",
+  "pane.newTitlePlaceholder": "Tên pane mới",
+  "pane.split": "Thêm pane bên cạnh",
+  "pane.duplicate": "Nhân đôi pane",
+  "pane.copyUrl": "Copy URL",
+  "pane.openExternal": "Mở ở trình duyệt ngoài",
+  "pane.resetSizes": "Chia lại kích thước đều",
+  "pane.moveToProfile": "Chuyển sang profile",
 
   // Downloads panel
   "downloads.title": "Tải xuống",

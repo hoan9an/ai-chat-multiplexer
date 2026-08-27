@@ -9,6 +9,11 @@ export interface UseMenuStatesResult {
   setIsDownloadsOpen: React.Dispatch<React.SetStateAction<boolean>>;
   isSettingsOpen: boolean;
   setIsSettingsOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  /** Pane whose overflow menu is open, or null. Lifted here so the native
+   * webviews can be suspended while it is showing — otherwise the child
+   * webview would paint over the dropdown. */
+  openPaneMenuId: string | null;
+  setOpenPaneMenuId: React.Dispatch<React.SetStateAction<string | null>>;
 }
 
 /**
@@ -20,9 +25,12 @@ export function useMenuStates(): UseMenuStatesResult {
   const [isWorkspaceMenuOpen, setIsWorkspaceMenuOpen] = useState(false);
   const [isDownloadsOpen, setIsDownloadsOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [openPaneMenuId, setOpenPaneMenuId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!isNewPaneMenuOpen && !isWorkspaceMenuOpen && !isDownloadsOpen) return;
+    if (!isNewPaneMenuOpen && !isWorkspaceMenuOpen && !isDownloadsOpen && !openPaneMenuId) {
+      return;
+    }
 
     const handlePointerDown = (event: PointerEvent) => {
       const target = event.target as Element | null;
@@ -33,6 +41,9 @@ export function useMenuStates(): UseMenuStatesResult {
       }
       if (isWorkspaceMenuOpen && !target.closest(".workspace-switcher")) {
         setIsWorkspaceMenuOpen(false);
+      }
+      if (openPaneMenuId && !target.closest(".pane-menu")) {
+        setOpenPaneMenuId(null);
       }
       if (
         isDownloadsOpen &&
@@ -45,7 +56,7 @@ export function useMenuStates(): UseMenuStatesResult {
 
     window.addEventListener("pointerdown", handlePointerDown, true);
     return () => window.removeEventListener("pointerdown", handlePointerDown, true);
-  }, [isNewPaneMenuOpen, isWorkspaceMenuOpen, isDownloadsOpen]);
+  }, [isNewPaneMenuOpen, isWorkspaceMenuOpen, isDownloadsOpen, openPaneMenuId]);
 
   return {
     isNewPaneMenuOpen,
@@ -56,5 +67,7 @@ export function useMenuStates(): UseMenuStatesResult {
     setIsDownloadsOpen,
     isSettingsOpen,
     setIsSettingsOpen,
+    openPaneMenuId,
+    setOpenPaneMenuId,
   };
 }

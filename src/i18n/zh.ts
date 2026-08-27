@@ -172,6 +172,18 @@ export const zh: Dictionary = {
   "pane.previewNotice":
     "该网页无法在预览中显示。在桌面应用（Tauri）中，内容将完整显示。",
   "pane.openInBrowser": "在浏览器中打开",
+  "pane.resizeColumns": "拖动以调整第 {index} 列宽度",
+  "pane.resizeRows": "拖动以调整第 {index} 行高度",
+  "pane.menu": "窗格选项",
+  "pane.rename": "重命名窗格",
+  "pane.renameTitle": "重命名窗格",
+  "pane.newTitlePlaceholder": "新窗格名称",
+  "pane.split": "在旁边新增窗格",
+  "pane.duplicate": "复制窗格",
+  "pane.copyUrl": "复制网址",
+  "pane.openExternal": "在外部浏览器打开",
+  "pane.resetSizes": "重置为等分",
+  "pane.moveToProfile": "移至配置",
 
   // Downloads panel
   "downloads.title": "下载",

@@ -178,6 +178,18 @@ export const en: Dictionary = {
   "pane.previewNotice":
     "This site cannot be shown in the preview. In the desktop app (Tauri), the content displays fully.",
   "pane.openInBrowser": "Open in browser",
+  "pane.resizeColumns": "Drag to resize column {index}",
+  "pane.resizeRows": "Drag to resize row {index}",
+  "pane.menu": "Pane options",
+  "pane.rename": "Rename pane",
+  "pane.renameTitle": "Rename pane",
+  "pane.newTitlePlaceholder": "New pane title",
+  "pane.split": "Add pane beside",
+  "pane.duplicate": "Duplicate pane",
+  "pane.copyUrl": "Copy URL",
+  "pane.openExternal": "Open in external browser",
+  "pane.resetSizes": "Reset sizes evenly",
+  "pane.moveToProfile": "Move to profile",
 
   // Downloads panel
   "downloads.title": "Downloads",

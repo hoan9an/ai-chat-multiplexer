@@ -13,6 +13,7 @@ import { useNativeWebviews } from "./hooks/useNativeWebviews";
 import { useBackupAndUpdates } from "./hooks/useBackupAndUpdates";
 import { useNativeTabStatus } from "./hooks/useNativeTabStatus";
 import { usePaneActions } from "./hooks/usePaneActions";
+import { usePaneResize } from "./hooks/usePaneResize";
 import { usePromptDialogs } from "./hooks/usePromptDialogs";
 import { useProfileWorkspaceActions } from "./hooks/useProfileWorkspaceActions";
 import { useNativeNewWindowRequests } from "./hooks/useNativeNewWindowRequests";
@@ -36,6 +37,8 @@ function DesktopApp() {
     setIsDownloadsOpen,
     isSettingsOpen,
     setIsSettingsOpen,
+    openPaneMenuId,
+    setOpenPaneMenuId,
   } = useMenuStates();
   const {
     textPrompt,
@@ -93,6 +96,9 @@ function DesktopApp() {
     activePanes,
     visiblePanes,
     effectiveColumns,
+    effectiveRows,
+    colSizes,
+    rowSizes,
     shouldSuspendNativeWebviews,
   } = useDerivedWorkspaceState({
     state,
@@ -101,6 +107,7 @@ function DesktopApp() {
     isWorkspaceMenuOpen,
     isSettingsOpen,
     isDownloadsOpen,
+    openPaneMenuId,
     draggingPaneId,
     draggingTabKey,
     textPrompt,
@@ -133,8 +140,14 @@ function DesktopApp() {
     moveTabAcrossPanes,
     detachTabToNewPane,
     finishPaneDrag,
+    duplicatePane,
+    splitPane,
+    movePaneProfile,
+    copyActiveTabUrl,
+    openActiveTabExternally,
   } = usePaneActions({
     setState,
+    activePanes,
     focusedPaneId,
     paneDrag,
     editingUrls,
@@ -143,6 +156,15 @@ function DesktopApp() {
     setDragOverPaneId,
   });
 
+  const { activeSplitter, gridRef, beginSplitterDrag, nudgeSplitter, resetTrackSizes } =
+    usePaneResize({
+      updateActiveWorkspace,
+      colSizes,
+      rowSizes,
+      effectiveColumns,
+      effectiveRows,
+    });
+
   useNativeTabStatus({ activePanes, focusedPaneId, updateActivePane });
 
   const {
@@ -150,6 +172,7 @@ function DesktopApp() {
     getProfileById,
     ensureProfileWithName,
     renameProfile,
+    renamePane,
     deleteProfile,
     switchWorkspace,
     createWorkspace,
@@ -217,6 +240,9 @@ function DesktopApp() {
         visiblePanes={visiblePanes}
         activePanes={activePanes}
         effectiveColumns={effectiveColumns}
+        effectiveRows={effectiveRows}
+        colSizes={colSizes}
+        rowSizes={rowSizes}
         focusedPaneId={focusedPaneId}
         dragOverPaneId={dragOverPaneId}
         draggingTabKey={draggingTabKey}
@@ -225,7 +251,15 @@ function DesktopApp() {
         paneDrag={paneDrag}
         tabDrag={tabDrag}
         webviewShells={webviewShells}
+        gridRef={gridRef}
+        activeSplitter={activeSplitter}
+        beginSplitterDrag={beginSplitterDrag}
+        nudgeSplitter={nudgeSplitter}
+        resetTrackSizes={resetTrackSizes}
+        openPaneMenuId={openPaneMenuId}
+        setOpenPaneMenuId={setOpenPaneMenuId}
         getProfileById={getProfileById}
+        profiles={state.profiles}
         setFocusedPaneId={setFocusedPaneId}
         setDraggingPaneId={setDraggingPaneId}
         setDragOverPaneId={setDragOverPaneId}
@@ -244,6 +278,12 @@ function DesktopApp() {
         moveTabWithinPane={moveTabWithinPane}
         moveTabAcrossPanes={moveTabAcrossPanes}
         detachTabToNewPane={detachTabToNewPane}
+        renamePane={renamePane}
+        duplicatePane={duplicatePane}
+        splitPane={splitPane}
+        movePaneProfile={movePaneProfile}
+        copyActiveTabUrl={copyActiveTabUrl}
+        openActiveTabExternally={openActiveTabExternally}
       />
       <AppOverlays
         textPrompt={textPrompt}

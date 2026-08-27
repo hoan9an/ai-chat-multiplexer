@@ -18,6 +18,8 @@ import { recordDiagnostic } from "../diagnostics";
 
 export interface UsePaneActionsArgs {
   setState: React.Dispatch<React.SetStateAction<AppState>>;
+  /** Panes of the active workspace; read by the actions that inspect a tab. */
+  activePanes: ChatPane[];
   focusedPaneId: string | null;
   paneDrag: React.MutableRefObject<{
     paneId: string;
@@ -63,10 +65,16 @@ export interface PaneActions {
   detachTabToNewPane: (sourcePaneId: string, sourceTabId: string) => void;
   movePane: (sourcePaneId: string, targetPaneId: string) => void;
   finishPaneDrag: (clientX: number, clientY: number) => void;
+  duplicatePane: (paneId: string) => void;
+  splitPane: (paneId: string) => void;
+  movePaneProfile: (paneId: string, profileId: string) => void;
+  copyActiveTabUrl: (paneId: string) => void;
+  openActiveTabExternally: (paneId: string) => void;
 }
 
 export function usePaneActions({
   setState,
+  activePanes,
   focusedPaneId,
   paneDrag,
   editingUrls,
@@ -424,6 +432,128 @@ export function usePaneActions({
     setDragOverPaneId(null);
   }
 
+  /** Fresh copies of `tabs` with new IDs, so native webview labels stay unique. */
+  function cloneTabsWithNewIds(tabs: ChatTab[]): ChatTab[] {
+    return tabs.map((tab) => ({ ...tab, id: createId("tab"), isLoading: false }));
+  }
+
+  function duplicatePane(paneId: string) {
+    updateActiveWorkspace((workspace) => {
+      const source = workspace.panes.find((pane) => pane.id === paneId);
+      if (!source) return workspace;
+
+      // Tab IDs become native webview labels, so a duplicate needs its own set;
+      // reusing them would collide with the source pane's live webviews.
+      const tabs = cloneTabsWithNewIds(source.tabs);
+      const activeIndex = source.tabs.findIndex((tab) => tab.id === source.activeTabId);
+      const duplicate: ChatPane = {
+        ...source,
+        id: createId("pane"),
+        tabs,
+        activeTabId: tabs[activeIndex >= 0 ? activeIndex : 0].id,
+      };
+
+      const index = workspace.panes.findIndex((pane) => pane.id === paneId);
+      const panes = [...workspace.panes];
+      panes.splice(index + 1, 0, duplicate);
+      return { ...workspace, panes };
+    });
+  }
+
+  /** Insert a blank pane sharing this pane's profile directly after it. */
+  function splitPane(paneId: string) {
+    updateActiveWorkspace((workspace) => {
+      const source = workspace.panes.find((pane) => pane.id === paneId);
+      if (!source) return workspace;
+
+      const tabId = createId("tab");
+      const newTabUrl = getNewTabUrl();
+      const newPane: ChatPane = {
+        id: createId("pane"),
+        title: source.title,
+        profileId: source.profileId,
+        activeTabId: tabId,
+        tabs: [
+          {
+            id: tabId,
+            title: NEW_TAB_TITLE,
+            url: newTabUrl,
+            loadedUrl: newTabUrl,
+            currentUrl: newTabUrl,
+            faviconUrl: NEW_TAB_ICON,
+          },
+        ],
+      };
+
+      const index = workspace.panes.findIndex((pane) => pane.id === paneId);
+      const panes = [...workspace.panes];
+      panes.splice(index + 1, 0, newPane);
+      return { ...workspace, panes };
+    });
+  }
+
+  function movePaneProfile(paneId: string, profileId: string) {
+    updateActivePane(paneId, (pane) => {
+      if (pane.profileId === profileId) return pane;
+
+      // The native webview is keyed by tab ID and its session directory is fixed
+      // at creation, so an existing webview would keep using the old profile's
+      // cookies. New tab IDs force the old webviews closed and recreated against
+      // the new session directory.
+      const tabs = cloneTabsWithNewIds(pane.tabs);
+      const activeIndex = pane.tabs.findIndex((tab) => tab.id === pane.activeTabId);
+
+      return {
+        ...pane,
+        profileId,
+        tabs,
+        activeTabId: tabs[activeIndex >= 0 ? activeIndex : 0].id,
+      };
+    });
+  }
+
+  /** Address of the pane's active tab, or "" for a blank new-tab page. */
+  function getActiveTabUrl(paneId: string): string {
+    const pane = activePanes.find((candidate) => candidate.id === paneId);
+    if (!pane) return "";
+    const tab = pane.tabs.find((candidate) => candidate.id === pane.activeTabId);
+    return tab ? getDisplayUrl(tab) : "";
+  }
+
+  function copyActiveTabUrl(paneId: string) {
+    const url = getActiveTabUrl(paneId);
+    if (!url) return;
+
+    void navigator.clipboard?.writeText(url).catch((error) => {
+      recordDiagnostic({
+        component: "pane",
+        code: "COPY_URL_FAILED",
+        severity: "warning",
+      });
+      console.error("clipboard writeText failed", error);
+    });
+  }
+
+  function openActiveTabExternally(paneId: string) {
+    const url = getActiveTabUrl(paneId);
+    if (!url) return;
+
+    if (!isTauriRuntime()) {
+      window.open(url, "_blank", "noopener");
+      return;
+    }
+
+    void invoke("plugin:opener|open_url", { url }).catch((error) => {
+      recordDiagnostic({
+        component: "pane",
+        code: "OPEN_EXTERNAL_FAILED",
+        severity: "warning",
+        context: { command: "plugin:opener|open_url" },
+      });
+      console.error("plugin:opener|open_url failed", error);
+      window.open(url, "_blank", "noopener");
+    });
+  }
 
   return {
     updateActiveWorkspace,
@@ -441,5 +571,10 @@ export function usePaneActions({
     detachTabToNewPane,
     movePane,
     finishPaneDrag,
+    duplicatePane,
+    splitPane,
+    movePaneProfile,
+    copyActiveTabUrl,
+    openActiveTabExternally,
   };
 }
