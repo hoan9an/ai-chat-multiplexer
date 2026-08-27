@@ -22,10 +22,15 @@ DeepSeek, and Grok. Inclusion means the provider is tested and its limitations
 are recorded. It is not a guarantee that every provider-owned flow will remain
 available after a provider changes its website or authentication policy.
 
-The app will not spoof a user agent, inject cookies, decrypt session storage, or
-bypass an OAuth/provider restriction. A flow prohibited in embedded user agents
-is documented as a provider limitation and uses a system-browser fallback only
-when a supported callback flow exists.
+The app sets a plain Chrome user agent string on each provider pane. The string
+keeps the real major version of the installed WebView2 runtime and only drops the
+`Edg/` and WebView2 tokens that the runtime appends by default. The app does not
+inject cookies, decrypt session storage, or bypass an OAuth/provider restriction.
+User-Agent Client Hints (`Sec-CH-UA`, `navigator.userAgentData`) are left at the
+runtime default and still report `Microsoft Edge WebView2`, so a provider that
+checks client hints can still identify the embedded runtime. A flow prohibited in
+embedded user agents is documented as a provider limitation and uses a
+system-browser fallback only when a supported callback flow exists.
 
 ## Installer and update support
 

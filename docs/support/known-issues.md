@@ -20,8 +20,11 @@ Evidence location (redacted):
 
 ## Current limitations
 
-- Provider-owned OAuth flows may reject embedded user agents. The app does not
-  spoof user agents or bypass provider policy.
+- Provider-owned OAuth flows may reject embedded user agents. Panes send a plain
+  Chrome user agent string (real WebView2 major version, no `Edg/` token), but
+  User-Agent Client Hints still report `Microsoft Edge WebView2`, so a provider
+  that reads client hints can still refuse the flow. The app does not bypass
+  provider policy.
 - A popup that opens `about:blank` and navigates only after creation cannot be
   converted safely into an app tab without a later URL. It is denied and shown
   as an unsupported popup until the provider has a tested fallback.

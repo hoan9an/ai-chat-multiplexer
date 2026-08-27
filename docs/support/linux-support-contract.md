@@ -18,8 +18,9 @@ until a named RPM-family distribution is selected and tested.
 - Package trust/distribution policy is defined separately from Tauri updater
   signatures. Updater signature, SHA256, provenance, exact inventory, rollback,
   known issues, and native smoke evidence remain mandatory.
-- Provider restrictions are documented and never bypassed through user-agent
-  spoofing, cookie injection, or protected-session copying.
+- Provider restrictions are documented and never bypassed through cookie
+  injection or protected-session copying. Panes set a plain Chrome user agent
+  string; client hints are left at the runtime default.
 
 Until every gate is met, release notes and product surfaces must use
 `experimental` or `coming soon`, and beta support SLA does not apply.

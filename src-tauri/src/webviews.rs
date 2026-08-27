@@ -158,6 +158,35 @@ fn urlencoding_decode(input: &str) -> String {
     out
 }
 
+/// Phiên bản Chrome dự phòng khi không đọc được runtime WebView2.
+const FALLBACK_CHROME_MAJOR: &str = "151";
+
+/// Lấy major version của runtime webview (ví dụ `151.0.4129.101` -> `151`).
+fn chrome_major_version(runtime_version: Option<&str>) -> &str {
+    runtime_version
+        .and_then(|version| version.split('.').next())
+        .map(str::trim)
+        .filter(|major| !major.is_empty() && major.chars().all(|c| c.is_ascii_digit()))
+        .unwrap_or(FALLBACK_CHROME_MAJOR)
+}
+
+/// User agent Chrome thuần cho pane: giữ đúng major version của runtime nhưng bỏ
+/// token `Edg/` mà WebView2 tự thêm vào, vì một số provider chặn UA nhúng đó.
+fn chrome_user_agent(runtime_version: Option<&str>) -> String {
+    let major = chrome_major_version(runtime_version);
+
+    #[cfg(target_os = "windows")]
+    let platform = "Windows NT 10.0; Win64; x64";
+    #[cfg(target_os = "macos")]
+    let platform = "Macintosh; Intel Mac OS X 10_15_7";
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    let platform = "X11; Linux x86_64";
+
+    format!(
+        "Mozilla/5.0 ({platform}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{major}.0.0.0 Safari/537.36"
+    )
+}
+
 #[tauri::command]
 pub(crate) async fn native_webview_upsert(
     app: tauri::AppHandle,
@@ -201,6 +230,7 @@ pub(crate) async fn native_webview_upsert(
     let popup_label = label.clone();
     let webview_builder = WebviewBuilder::new(&label, WebviewUrl::External(parsed_url))
         .data_directory(session_dir)
+        .user_agent(&chrome_user_agent(tauri::webview_version().ok().as_deref()))
         .enable_clipboard_access()
         .on_new_window(move |url, _features| {
             let request = new_window_request(&popup_label, &url);
@@ -575,5 +605,35 @@ mod tests {
             assert_eq!(request.reason, expected_reason);
             assert!(request.url.is_none());
         }
+    }
+
+    #[test]
+    fn chrome_major_version_uses_runtime_major() {
+        assert_eq!(chrome_major_version(Some("151.0.4129.101")), "151");
+        assert_eq!(chrome_major_version(Some("99.1.2.3")), "99");
+    }
+
+    #[test]
+    fn chrome_major_version_falls_back_on_unusable_runtime_version() {
+        for bad in [None, Some(""), Some("   "), Some("beta.1"), Some("v151.0")] {
+            assert_eq!(chrome_major_version(bad), FALLBACK_CHROME_MAJOR);
+        }
+    }
+
+    #[test]
+    fn chrome_user_agent_drops_webview_and_edge_tokens() {
+        let agent = chrome_user_agent(Some("151.0.4129.101"));
+        assert!(agent.contains("Chrome/151.0.0.0"), "agent = {agent}");
+        assert!(agent.contains("Safari/537.36"));
+        assert!(!agent.contains("Edg/"));
+        assert!(!agent.contains("WebView"));
+        assert!(agent.starts_with("Mozilla/5.0 ("));
+    }
+
+    #[test]
+    fn chrome_user_agent_is_single_line_without_control_chars() {
+        let agent = chrome_user_agent(None);
+        assert!(!agent.chars().any(|c| c.is_control()));
+        assert!(agent.contains(&format!("Chrome/{FALLBACK_CHROME_MAJOR}.0.0.0")));
     }
 }
